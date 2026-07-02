@@ -17,11 +17,9 @@ MON={'01':'Jan','02':'Feb','03':'Mar','04':'Apr','05':'May','06':'Jun','07':'Jul
 def wk(s):
     return MON.get(s[5:7],s[5:7])+" "+s[8:10] if (isinstance(s,str) and len(s)==10 and s[4]=='-') else str(s)
 
-def series(rows, monthly=False):
-    ns=[float(r["den"]) for r in rows] or [1]
-    med=sorted(ns)[len(ns)//2]
-    return [{"x":wk(r["wk"]),"v":float(r["pct"]),"n":int(r["den"]),
-             "partial":(not monthly) and float(r["den"])<0.4*med} for r in rows]
+def series(rows):
+    return [{"date":r["wk"],"v":float(r["pct"]),
+             "num":int(float(r.get("num",r["den"]))),"den":int(float(r["den"]))} for r in rows]
 
 # ---- assemble the two parts ----
 nsm_new = D["new_nsm_headline"]; d1 = D["new_d1_headline"]
@@ -30,10 +28,10 @@ ten = D["ten_nsm_headline"]; tdrv = D["ten_driver_buckets"]
 gad = D["guard_activedays"]; g1d = D["guard_oneday_headline"]
 
 SER = {
- "new_nsm": {"legacy":85,"legacyLabel":"Legacy M1 ~85%","note":None,"type":"weekly","points":series(D["new_nsm_weekly"])},
- "new_d1":  {"legacy":None,"legacyLabel":None,"note":None,"type":"weekly","points":series(D["new_d1_weekly"])},
- "ten_nsm": {"legacy":90,"band":[85,95],"legacyLabel":"Legacy 85–95%","note":None,"type":"monthly","points":series(D["ten_nsm_series"],True)},
- "oneday":  {"legacy":None,"legacyLabel":None,"note":None,"type":"weekly","points":series(D["guard_oneday_weekly"])},
+ "new_nsm": {"legacy":85,"band":None,"legacyLabel":"Legacy M1 ~85%","gran":"daily","agg":"sum","toggle":True,"points":series(D["new_nsm_daily"])},
+ "new_d1":  {"legacy":None,"band":None,"legacyLabel":None,"gran":"weekly","agg":"sum","toggle":False,"points":series(D["new_d1_weekly"])},
+ "ten_nsm": {"legacy":90,"band":[85,95],"legacyLabel":"Legacy 85–95%","gran":"daily","agg":"sample","toggle":True,"points":series(D["ten_nsm_daily"])},
+ "oneday":  {"legacy":None,"band":None,"legacyLabel":None,"gran":"weekly","agg":"sum","toggle":False,"points":series(D["guard_oneday_weekly"])},
 }
 
 def bars(rowset, accent):
@@ -112,6 +110,9 @@ html = f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
  .panel.open{{max-height:500px;opacity:1}} .pinner{{padding:18px 22px}}
  .phead{{display:flex;justify-content:space-between;align-items:baseline}} .ptitle{{font-size:15px;font-weight:700}} .ptitle small{{color:var(--sub);font-weight:600;font-size:12px}}
  .pdelta{{font-size:13px;font-weight:700}} .up{{color:#1f7a70}} .down{{color:#c0392b}}
+ .pright{{display:flex;align-items:center;gap:12px}} .pgran{{display:inline-flex;gap:4px}}
+ .gbtn{{font-size:10.5px;font-weight:700;padding:3px 10px;border-radius:6px;border:1px solid var(--line);background:#f4f6fa;color:var(--sub);cursor:pointer}}
+ .gbtn.on{{background:#14284a;color:#fff;border-color:#14284a}}
  #chart,#chart2{{min-height:236px}} #chart svg,#chart2 svg{{display:block;width:100%;height:236px}}
  .notes{{background:#fff;border:1px solid var(--line);border-radius:12px;padding:16px 20px;font-size:12.5px;color:#374861;line-height:1.6;margin-top:14px}}
  .notes li{{margin:3px 0}} .foot{{margin-top:20px;font-size:11px;color:#93a1b5;text-align:center}}
@@ -119,7 +120,7 @@ html = f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
  <div class="top">
   <div><div class="eyebrow">Customer POD · J2</div><h1>Recharge → Exit renewal health</h1>
    <div class="h1sub">Two journeys: winning the first paid recharge, then keeping the paying base.</div></div>
-  <div class="asof">as of <b>{asof}</b>, IST<br>rolling windows<br>PAYG = <b>combined_setting_id 22</b></div>
+  <div class="asof">as of <b>{asof}</b>, IST<br>rolling windows<br>base = <b>all Home broadband</b></div>
  </div>
 
  <div class="tabs"><div class="tab on" data-p="new" onclick="showPart('new')">New customer</div>
@@ -129,7 +130,8 @@ html = f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
    <div class="owner">Question: do new customers sign up and survive their first cycle. Owner: activation / onboarding.</div>
    <div class="grid">{p1}</div>
    <div class="panel" id="panel-new"><div class="pinner">
-     <div class="phead"><div class="ptitle" id="pt-new"></div><div class="pdelta" id="pd-new"></div></div><div id="chart"></div></div></div>
+     <div class="phead"><div class="ptitle" id="pt-new"></div>
+       <div class="pright"><span class="pgran" id="pg-new"></span><span class="pdelta" id="pd-new"></span></div></div><div id="chart"></div></div></div>
    <div class="sec">Driver 2 — first-renewal R0, by first-plan bucket</div>
    <div class="card">{p1_d2}</div>
  </div>
@@ -138,19 +140,20 @@ html = f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
    <div class="owner">Question: is the paying base staying month over month. Owner: retention.</div>
    <div class="grid">{p2}{g_html}</div>
    <div class="panel" id="panel-ten"><div class="pinner">
-     <div class="phead"><div class="ptitle" id="pt-ten"></div><div class="pdelta" id="pd-ten"></div></div><div id="chart2"></div></div></div>
+     <div class="phead"><div class="ptitle" id="pt-ten"></div>
+       <div class="pright"><span class="pgran" id="pg-ten"></span><span class="pdelta" id="pd-ten"></span></div></div><div id="chart2"></div></div></div>
    <div class="sec">Driver — on-time renewal (R0), by plan bucket</div>
    <div class="card">{p2_drv}</div>
  </div>
 
  <div class="notes"><ul>
-   <li>PAYG = recharge on a combined_setting_id=22 plan. New installs and migrated. Standard trum filters, IST.</li>
+   <li>Base = all Home broadband (store_group_id=0), every plan type (PAYG, legacy, migrated). Standard trum filters, IST. Only split is tenure (new &lt;43d / tenured).</li>
    <li>Active = plan live at the checkpoint or last plan ended within 15 days. New vs tenured split at 43 days from install.</li>
    <li>Day-43 retention counts all installs, so non-converters count against it. Conversion matures ~9 days after install; day-43 lags six weeks and is the confirming outcome.</li>
    <li>First-renewal R0 and on-time R0 read per plan bucket, never blended. Windows roll on the last 30 days / matured cohorts.</li>
    <li>Refreshed daily from Metabase. Not yet cross-checked against an existing Metabase dashboard.</li>
  </ul></div>
- <div class="foot">Hollow points are partial periods.</div>
+ <div class="foot">Both NSMs toggle daily / weekly. Tenured is a 30-day rolling ratio; its earliest daily points sit on a small base.</div>
 </div>
 <script>
 const SER={ser_json};
@@ -158,32 +161,52 @@ const ACC={{new_nsm:'{NAVY}',new_d1:'{TEAL}',ten_nsm:'{NAVY}',oneday:'{GOLD}'}};
 const GOODDOWN={{oneday:true}};
 const NAME={{new_nsm:'Day-43 retention',new_d1:'First-paid conversion',ten_nsm:'Active-base retention',oneday:'1-day plan %'}};
 const PANEL={{new_nsm:'new',new_d1:'new',ten_nsm:'ten',oneday:'ten'}};
+const MO=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 let cur={{new:null,ten:null}};
+let gran={{new_nsm:'daily',new_d1:'weekly',ten_nsm:'daily',oneday:'weekly'}};
+function lbl(ds){{return MO[+ds.slice(5,7)-1]+' '+ds.slice(8,10);}}
+function isoMon(ds){{const d=new Date(ds+'T00:00:00');const wd=(d.getDay()+6)%7;d.setDate(d.getDate()-wd);return d.toISOString().slice(0,10);}}
+function getPoints(k){{const s=SER[k];
+  if(s.gran==='weekly'||gran[k]==='daily') return s.points.map(p=>({{x:lbl(p.date),v:p.v,n:p.den}}));
+  const m={{}};s.points.forEach(p=>{{const w=isoMon(p.date);(m[w]=m[w]||[]).push(p);}});
+  return Object.keys(m).sort().map(w=>{{const g=m[w];
+    if(s.agg==='sum'){{let nu=0,de=0;g.forEach(p=>{{nu+=p.num;de+=p.den;}});return {{x:lbl(w),v:Math.round(nu*1000/de)/10,n:de}};}}
+    const lp=g[g.length-1];return {{x:lbl(lp.date),v:lp.v,n:lp.den}};}});
+}}
 function showPart(p){{document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('on',t.dataset.p===p));
   document.querySelectorAll('.part').forEach(x=>x.classList.toggle('on',x.id==='part-'+p));}}
 function showTrend(k){{
-  const p=PANEL[k], panel=document.getElementById('panel-'+p), chartId=(p==='new'?'chart':'chart2');
+  const p=PANEL[k], panel=document.getElementById('panel-'+p);
   document.querySelectorAll('#part-'+p+' .metric').forEach(m=>m.classList.toggle('active',m.dataset.k===k));
   if(cur[p]===k){{panel.classList.remove('open');document.querySelectorAll('#part-'+p+' .metric').forEach(m=>m.classList.remove('active'));cur[p]=null;return;}}
-  cur[p]=k; const s=SER[k], pts=s.points, last=pts[pts.length-1], prev=pts[pts.length-2];
-  document.getElementById('pt-'+p).innerHTML=NAME[k]+' <small>· '+(s.type==='monthly'?'monthly':'weekly')+'</small>';
+  cur[p]=k;
+  document.getElementById('pg-'+p).innerHTML = SER[k].toggle
+    ? `<button class='gbtn ${{gran[k]==='daily'?'on':''}}' onclick="setGran('${{k}}','daily')">Daily</button><button class='gbtn ${{gran[k]==='weekly'?'on':''}}' onclick="setGran('${{k}}','weekly')">Weekly</button>` : '';
+  render(k); panel.classList.add('open');
+}}
+function setGran(k,g){{gran[k]=g;const p=PANEL[k];
+  document.getElementById('pg-'+p).querySelectorAll('.gbtn').forEach(b=>b.classList.toggle('on',b.textContent.toLowerCase()===g));
+  render(k);}}
+function render(k){{const p=PANEL[k],s=SER[k],pts=getPoints(k),last=pts[pts.length-1],prev=pts[pts.length-2];
+  document.getElementById('pt-'+p).innerHTML=NAME[k]+" <small>· "+(s.toggle?gran[k]:s.gran)+"</small>";
   const dEl=document.getElementById('pd-'+p);
   if(prev){{const dv=last.v-prev.v,imp=GOODDOWN[k]?(dv<0):(dv>0);dEl.className='pdelta '+(imp?'up':'down');dEl.textContent=(dv>0?'+':'')+dv.toFixed(1)+'pp';}} else dEl.textContent='';
-  document.getElementById(chartId).innerHTML=chart(s,ACC[k]); panel.classList.add('open');
+  document.getElementById(p==='new'?'chart':'chart2').innerHTML=chart(s,ACC[k],pts);
 }}
-function chart(s,acc){{
+function chart(s,acc,pts){{
   const W=1040,H=230,pl=42,pr=130,pt=20,pb=36,iw=W-pl-pr,ih=H-pt-pb;
-  const vals=s.points.map(p=>p.v).concat(s.legacy?[s.legacy]:[]).concat(s.band||[]);
+  const vals=pts.map(p=>p.v).concat(s.legacy?[s.legacy]:[]).concat(s.band||[]);
   let mn=Math.min(...vals),mx=Math.max(...vals);const pad=Math.max(1,(mx-mn)*0.25);mn=Math.floor(mn-pad);mx=Math.ceil(mx+pad);
-  const n=s.points.length,X=i=>pl+(n===1?iw/2:iw*i/(n-1)),Y=v=>pt+ih*(1-(v-mn)/(mx-mn));let g='';
+  const n=pts.length,X=i=>pl+(n===1?iw/2:iw*i/(n-1)),Y=v=>pt+ih*(1-(v-mn)/(mx-mn));let g='';
   for(let k=0;k<=4;k++){{const val=mn+(mx-mn)*k/4,y=Y(val);g+=`<line x1='${{pl}}' y1='${{y}}' x2='${{pl+iw}}' y2='${{y}}' stroke='#eef1f6'/><text x='${{pl-8}}' y='${{y+3}}' font-size='10' fill='#93a1b5' text-anchor='end'>${{val.toFixed(0)}}%</text>`;}}
   if(s.band){{const y1=Y(s.band[1]),y2=Y(s.band[0]);g+=`<rect x='${{pl}}' y='${{y1}}' width='${{iw}}' height='${{y2-y1}}' fill='#1f7a70' opacity='.06'/>`;}}
   if(s.legacy){{const y=Y(s.legacy);g+=`<line x1='${{pl}}' y1='${{y}}' x2='${{pl+iw}}' y2='${{y}}' stroke='#8a97ab' stroke-width='1.4' stroke-dasharray='5 4'/><text x='${{pl+iw+8}}' y='${{y+3}}' font-size='10.5' fill='#5b6b82'>${{s.legacyLabel}}</text>`;}}
-  let d='';s.points.forEach((p,i)=>{{d+=(i?'L':'M')+X(i)+' '+Y(p.v)+' ';}});g+=`<path d='${{d}}' fill='none' stroke='${{acc}}' stroke-width='2.4'/>`;
-  s.points.forEach((p,i)=>{{const x=X(i),y=Y(p.v),lastp=i===n-1,fill=p.partial?'#fff':acc,r=lastp?5:3.5;
-    g+=`<circle cx='${{x}}' cy='${{y}}' r='${{r}}' fill='${{fill}}' stroke='${{acc}}' stroke-width='${{p.partial?1.5:1}}'><title>${{p.x}} · ${{p.v}}% · n=${{p.n}}</title></circle>`;
-    if(lastp||i===0||n<=6)g+=`<text x='${{x}}' y='${{y-9}}' font-size='10.5' font-weight='700' fill='${{acc}}' text-anchor='middle'>${{p.v}}%</text>`;
-    if(n<=8||i%2===0||lastp)g+=`<text x='${{x}}' y='${{H-12}}' font-size='9.5' fill='#93a1b5' text-anchor='middle'>${{p.x}}</text>`;}});
+  let d='';pts.forEach((p,i)=>{{d+=(i?'L':'M')+X(i)+' '+Y(p.v)+' ';}});g+=`<path d='${{d}}' fill='none' stroke='${{acc}}' stroke-width='2.2'/>`;
+  const step=Math.max(1,Math.ceil(n/9)),rr=n>24?2:3.4;
+  pts.forEach((p,i)=>{{const x=X(i),y=Y(p.v),lastp=i===n-1;
+    g+=`<circle cx='${{x}}' cy='${{y}}' r='${{lastp?5:rr}}' fill='${{acc}}'><title>${{p.x}} · ${{p.v}}% · n=${{p.n}}</title></circle>`;
+    if(lastp||i===0)g+=`<text x='${{x}}' y='${{y-9}}' font-size='10.5' font-weight='700' fill='${{acc}}' text-anchor='${{lastp?'end':'start'}}'>${{p.v}}%</text>`;
+    if(lastp||i%step===0)g+=`<text x='${{x}}' y='${{H-12}}' font-size='9' fill='#93a1b5' text-anchor='middle'>${{p.x}}</text>`;}});
   return `<svg viewBox='0 0 ${{W}} ${{H}}' width='100%'>${{g}}</svg>`;
 }}
 </script></body></html>"""

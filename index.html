@@ -31,6 +31,9 @@
  .panel.open{max-height:500px;opacity:1} .pinner{padding:18px 22px}
  .phead{display:flex;justify-content:space-between;align-items:baseline} .ptitle{font-size:15px;font-weight:700} .ptitle small{color:var(--sub);font-weight:600;font-size:12px}
  .pdelta{font-size:13px;font-weight:700} .up{color:#1f7a70} .down{color:#c0392b}
+ .pright{display:flex;align-items:center;gap:12px} .pgran{display:inline-flex;gap:4px}
+ .gbtn{font-size:10.5px;font-weight:700;padding:3px 10px;border-radius:6px;border:1px solid var(--line);background:#f4f6fa;color:var(--sub);cursor:pointer}
+ .gbtn.on{background:#14284a;color:#fff;border-color:#14284a}
  #chart,#chart2{min-height:236px} #chart svg,#chart2 svg{display:block;width:100%;height:236px}
  .notes{background:#fff;border:1px solid var(--line);border-radius:12px;padding:16px 20px;font-size:12.5px;color:#374861;line-height:1.6;margin-top:14px}
  .notes li{margin:3px 0} .foot{margin-top:20px;font-size:11px;color:#93a1b5;text-align:center}
@@ -38,7 +41,7 @@
  <div class="top">
   <div><div class="eyebrow">Customer POD · J2</div><h1>Recharge → Exit renewal health</h1>
    <div class="h1sub">Two journeys: winning the first paid recharge, then keeping the paying base.</div></div>
-  <div class="asof">as of <b>02 Jul 2026</b>, IST<br>rolling windows<br>PAYG = <b>combined_setting_id 22</b></div>
+  <div class="asof">as of <b>02 Jul 2026</b>, IST<br>rolling windows<br>base = <b>all Home broadband</b></div>
  </div>
 
  <div class="tabs"><div class="tab on" data-p="new" onclick="showPart('new')">New customer</div>
@@ -52,86 +55,108 @@
       <div class="mtier">Driver · convert</div><div class="mname">First-paid conversion</div><div class="msub">Leading, ~9-day lag</div>
       <div class="mval">87.6%</div><div class="mdet">740 of 845 convert in 7d · 53% same-day</div><div class="mcue"><span class="cue">trend ↗</span></div></div></div>
    <div class="panel" id="panel-new"><div class="pinner">
-     <div class="phead"><div class="ptitle" id="pt-new"></div><div class="pdelta" id="pd-new"></div></div><div id="chart"></div></div></div>
+     <div class="phead"><div class="ptitle" id="pt-new"></div>
+       <div class="pright"><span class="pgran" id="pg-new"></span><span class="pdelta" id="pd-new"></span></div></div><div id="chart"></div></div></div>
    <div class="sec">Driver 2 — first-renewal R0, by first-plan bucket</div>
    <div class="card"><div class="bar"><div class="blab">1d</div>
-        <div class="btrk"><div class="bfill" style="width:57%;background:#1f7a70"></div></div>
-        <div class="bval">36.7%<span class="bden">547/1,491</span></div></div><div class="bar"><div class="blab">7d</div>
-        <div class="btrk"><div class="bfill" style="width:70%;background:#1f7a70"></div></div>
-        <div class="bval">45.2%<span class="bden">481/1,063</span></div></div><div class="bar"><div class="blab">28d</div>
-        <div class="btrk"><div class="bfill" style="width:70%;background:#1f7a70"></div></div>
-        <div class="bval">45.4%<span class="bden">4,600/10,130</span></div></div><div class="bar"><div class="blab">Other</div>
+        <div class="btrk"><div class="bfill" style="width:65%;background:#1f7a70"></div></div>
+        <div class="bval">40.1%<span class="bden">67/167</span></div></div><div class="bar"><div class="blab">7d</div>
+        <div class="btrk"><div class="bfill" style="width:77%;background:#1f7a70"></div></div>
+        <div class="bval">47.2%<span class="bden">59/125</span></div></div><div class="bar"><div class="blab">28d</div>
+        <div class="btrk"><div class="bfill" style="width:67%;background:#1f7a70"></div></div>
+        <div class="bval">41.3%<span class="bden">187/453</span></div></div><div class="bar"><div class="blab">Other</div>
         <div class="btrk"><div class="bfill" style="width:100%;background:#1f7a70"></div></div>
-        <div class="bval">64.6%<span class="bden">1,913/2,961</span></div></div></div>
+        <div class="bval">61.5%<span class="bden">211/343</span></div></div></div>
  </div>
 
  <div class="part" id="part-ten">
    <div class="owner">Question: is the paying base staying month over month. Owner: retention.</div>
    <div class="grid"><div class="metric" data-k="ten_nsm" style="--a:#14284a" onclick="showTrend('ten_nsm')">
       <div class="mtier">NSM · monthly</div><div class="mname">Active-base retention</div><div class="msub">Owner: retention</div>
-      <div class="mval">88.9%</div><div class="mdet">28,623 of 32,197 tenured still active</div><div class="mcue"><span class="cue">trend ↗</span></div></div><div class="metric notrend" style="--a:#c68a1a">
+      <div class="mval">87.5%</div><div class="mdet">92,125 of 105,252 tenured still active</div><div class="mcue"><span class="cue">trend ↗</span></div></div><div class="metric notrend" style="--a:#c68a1a">
     <div class="mtier">Guardrail</div><div class="mname">% active days</div><div class="msub">Tenured active base</div>
-    <div class="mval">90%</div>
-    <div class="mdet">avg coverage · 2.7% under 30% (1,015)</div><div class="mcue"></div></div>
+    <div class="mval">91%</div>
+    <div class="mdet">avg coverage · 2.3% under 30% (2,169)</div><div class="mcue"></div></div>
   <div class="metric" data-k="oneday" style="--a:#c68a1a" onclick="showTrend('oneday')">
     <div class="mtier">Guardrail · LTV</div><div class="mname">1-day plan %</div><div class="msub">Lower is better</div>
-    <div class="mval">24.3%</div>
-    <div class="mdet">30,681 of 126,320 recharges</div><div class="mcue"><span class="cue">trend ↗</span></div></div></div>
+    <div class="mval">20.7%</div>
+    <div class="mdet">30,681 of 147,934 recharges</div><div class="mcue"><span class="cue">trend ↗</span></div></div></div>
    <div class="panel" id="panel-ten"><div class="pinner">
-     <div class="phead"><div class="ptitle" id="pt-ten"></div><div class="pdelta" id="pd-ten"></div></div><div id="chart2"></div></div></div>
+     <div class="phead"><div class="ptitle" id="pt-ten"></div>
+       <div class="pright"><span class="pgran" id="pg-ten"></span><span class="pdelta" id="pd-ten"></span></div></div><div id="chart2"></div></div></div>
    <div class="sec">Driver — on-time renewal (R0), by plan bucket</div>
    <div class="card"><div class="bar"><div class="blab">1d</div>
-        <div class="btrk"><div class="bfill" style="width:91%;background:#14284a"></div></div>
-        <div class="bval">62.3%<span class="bden">12,483/20,026</span></div></div><div class="bar"><div class="blab">7d</div>
-        <div class="btrk"><div class="bfill" style="width:86%;background:#14284a"></div></div>
-        <div class="bval">59.3%<span class="bden">3,952/6,666</span></div></div><div class="bar"><div class="blab">28d</div>
-        <div class="btrk"><div class="bfill" style="width:72%;background:#14284a"></div></div>
-        <div class="bval">49.5%<span class="bden">12,934/26,153</span></div></div><div class="bar"><div class="blab">Other</div>
+        <div class="btrk"><div class="bfill" style="width:90%;background:#14284a"></div></div>
+        <div class="bval">60.2%<span class="bden">17,708/29,415</span></div></div><div class="bar"><div class="blab">7d</div>
+        <div class="btrk"><div class="bfill" style="width:85%;background:#14284a"></div></div>
+        <div class="bval">57.0%<span class="bden">5,806/10,190</span></div></div><div class="bar"><div class="blab">28d</div>
+        <div class="btrk"><div class="bfill" style="width:79%;background:#14284a"></div></div>
+        <div class="bval">52.8%<span class="bden">48,563/91,891</span></div></div><div class="bar"><div class="blab">Other</div>
         <div class="btrk"><div class="bfill" style="width:100%;background:#14284a"></div></div>
-        <div class="bval">68.7%<span class="bden">10,650/15,509</span></div></div></div>
+        <div class="bval">67.0%<span class="bden">16,032/23,932</span></div></div></div>
  </div>
 
  <div class="notes"><ul>
-   <li>PAYG = recharge on a combined_setting_id=22 plan. New installs and migrated. Standard trum filters, IST.</li>
+   <li>Base = all Home broadband (store_group_id=0), every plan type (PAYG, legacy, migrated). Standard trum filters, IST. Only split is tenure (new &lt;43d / tenured).</li>
    <li>Active = plan live at the checkpoint or last plan ended within 15 days. New vs tenured split at 43 days from install.</li>
    <li>Day-43 retention counts all installs, so non-converters count against it. Conversion matures ~9 days after install; day-43 lags six weeks and is the confirming outcome.</li>
    <li>First-renewal R0 and on-time R0 read per plan bucket, never blended. Windows roll on the last 30 days / matured cohorts.</li>
    <li>Refreshed daily from Metabase. Not yet cross-checked against an existing Metabase dashboard.</li>
  </ul></div>
- <div class="foot">Hollow points are partial periods.</div>
+ <div class="foot">Both NSMs toggle daily / weekly. Tenured is a 30-day rolling ratio; its earliest daily points sit on a small base.</div>
 </div>
 <script>
-const SER={"new_nsm": {"legacy": 85, "legacyLabel": "Legacy M1 ~85%", "note": null, "type": "weekly", "points": [{"x": "Mar 02", "v": 92.6, "n": 122, "partial": false}, {"x": "Mar 09", "v": 90.7, "n": 246, "partial": false}, {"x": "Mar 16", "v": 90.3, "n": 288, "partial": false}, {"x": "Mar 23", "v": 88.7, "n": 238, "partial": false}, {"x": "Mar 30", "v": 91.7, "n": 266, "partial": false}, {"x": "Apr 06", "v": 89.3, "n": 281, "partial": false}, {"x": "Apr 13", "v": 89.9, "n": 237, "partial": false}, {"x": "Apr 20", "v": 93.0, "n": 199, "partial": false}, {"x": "Apr 27", "v": 90.3, "n": 195, "partial": false}, {"x": "May 04", "v": 93.1, "n": 231, "partial": false}, {"x": "May 11", "v": 90.3, "n": 217, "partial": false}, {"x": "May 18", "v": 86.6, "n": 82, "partial": true}]}, "new_d1": {"legacy": null, "legacyLabel": null, "note": null, "type": "weekly", "points": [{"x": "Mar 30", "v": 85.7, "n": 112, "partial": false}, {"x": "Apr 06", "v": 89.6, "n": 297, "partial": false}, {"x": "Apr 13", "v": 90.6, "n": 245, "partial": false}, {"x": "Apr 20", "v": 87.3, "n": 204, "partial": false}, {"x": "Apr 27", "v": 84.4, "n": 192, "partial": false}, {"x": "May 04", "v": 88.2, "n": 221, "partial": false}, {"x": "May 11", "v": 84.7, "n": 235, "partial": false}, {"x": "May 18", "v": 85.1, "n": 201, "partial": false}, {"x": "May 25", "v": 83.9, "n": 168, "partial": false}, {"x": "Jun 01", "v": 83.9, "n": 180, "partial": false}, {"x": "Jun 08", "v": 89.8, "n": 236, "partial": false}, {"x": "Jun 15", "v": 88.9, "n": 217, "partial": false}, {"x": "Jun 22", "v": 90.1, "n": 71, "partial": true}]}, "ten_nsm": {"legacy": 90, "band": [85, 95], "legacyLabel": "Legacy 85\u201395%", "note": null, "type": "monthly", "points": [{"x": "May 03", "v": 83.4, "n": 844, "partial": false}, {"x": "Jun 02", "v": 87.8, "n": 5306, "partial": false}, {"x": "Jul 02", "v": 88.9, "n": 32197, "partial": false}]}, "oneday": {"legacy": null, "legacyLabel": null, "note": null, "type": "weekly", "points": [{"x": "Mar 30", "v": 18.8, "n": 6166, "partial": true}, {"x": "Apr 06", "v": 20.1, "n": 14299, "partial": false}, {"x": "Apr 13", "v": 22.6, "n": 12915, "partial": false}, {"x": "Apr 20", "v": 22.9, "n": 13596, "partial": false}, {"x": "Apr 27", "v": 23.9, "n": 16438, "partial": false}, {"x": "May 04", "v": 23.8, "n": 16857, "partial": false}, {"x": "May 11", "v": 21.4, "n": 20165, "partial": false}, {"x": "May 18", "v": 22.1, "n": 22432, "partial": false}, {"x": "May 25", "v": 24.5, "n": 22774, "partial": false}, {"x": "Jun 01", "v": 22.6, "n": 28053, "partial": false}, {"x": "Jun 08", "v": 23.2, "n": 28455, "partial": false}, {"x": "Jun 15", "v": 24.6, "n": 27375, "partial": false}, {"x": "Jun 22", "v": 26.3, "n": 28267, "partial": false}, {"x": "Jun 29", "v": 25.1, "n": 17549, "partial": false}]}};
+const SER={"new_nsm": {"legacy": 85, "band": null, "legacyLabel": "Legacy M1 ~85%", "gran": "daily", "agg": "sum", "toggle": true, "points": [{"date": "2026-03-21", "v": 91.2, "num": 31, "den": 34}, {"date": "2026-03-22", "v": 88.0, "num": 44, "den": 50}, {"date": "2026-03-23", "v": 93.8, "num": 30, "den": 32}, {"date": "2026-03-24", "v": 84.2, "num": 32, "den": 38}, {"date": "2026-03-25", "v": 88.6, "num": 31, "den": 35}, {"date": "2026-03-26", "v": 90.0, "num": 27, "den": 30}, {"date": "2026-03-27", "v": 86.2, "num": 25, "den": 29}, {"date": "2026-03-28", "v": 91.9, "num": 34, "den": 37}, {"date": "2026-03-29", "v": 86.5, "num": 32, "den": 37}, {"date": "2026-03-30", "v": 93.9, "num": 31, "den": 33}, {"date": "2026-03-31", "v": 93.3, "num": 28, "den": 30}, {"date": "2026-04-01", "v": 95.3, "num": 41, "den": 43}, {"date": "2026-04-02", "v": 97.0, "num": 32, "den": 33}, {"date": "2026-04-03", "v": 91.7, "num": 33, "den": 36}, {"date": "2026-04-04", "v": 87.8, "num": 43, "den": 49}, {"date": "2026-04-05", "v": 85.7, "num": 36, "den": 42}, {"date": "2026-04-06", "v": 89.1, "num": 41, "den": 46}, {"date": "2026-04-07", "v": 94.9, "num": 37, "den": 39}, {"date": "2026-04-08", "v": 88.2, "num": 45, "den": 51}, {"date": "2026-04-09", "v": 88.9, "num": 40, "den": 45}, {"date": "2026-04-10", "v": 88.0, "num": 22, "den": 25}, {"date": "2026-04-11", "v": 85.7, "num": 36, "den": 42}, {"date": "2026-04-12", "v": 90.9, "num": 30, "den": 33}, {"date": "2026-04-13", "v": 94.3, "num": 33, "den": 35}, {"date": "2026-04-14", "v": 92.5, "num": 37, "den": 40}, {"date": "2026-04-15", "v": 86.1, "num": 31, "den": 36}, {"date": "2026-04-16", "v": 86.7, "num": 26, "den": 30}, {"date": "2026-04-17", "v": 89.7, "num": 26, "den": 29}, {"date": "2026-04-18", "v": 85.7, "num": 24, "den": 28}, {"date": "2026-04-19", "v": 92.3, "num": 36, "den": 39}, {"date": "2026-04-20", "v": 97.1, "num": 33, "den": 34}, {"date": "2026-04-21", "v": 91.7, "num": 33, "den": 36}, {"date": "2026-04-22", "v": 91.3, "num": 21, "den": 23}, {"date": "2026-04-23", "v": 95.2, "num": 20, "den": 21}, {"date": "2026-04-24", "v": 87.0, "num": 20, "den": 23}, {"date": "2026-04-25", "v": 93.9, "num": 31, "den": 33}, {"date": "2026-04-26", "v": 93.1, "num": 27, "den": 29}, {"date": "2026-04-27", "v": 86.2, "num": 25, "den": 29}, {"date": "2026-04-28", "v": 92.9, "num": 26, "den": 28}, {"date": "2026-04-29", "v": 95.8, "num": 23, "den": 24}, {"date": "2026-04-30", "v": 77.3, "num": 17, "den": 22}, {"date": "2026-05-01", "v": 88.9, "num": 24, "den": 27}, {"date": "2026-05-02", "v": 94.3, "num": 33, "den": 35}, {"date": "2026-05-03", "v": 93.3, "num": 28, "den": 30}, {"date": "2026-05-04", "v": 93.3, "num": 42, "den": 45}, {"date": "2026-05-05", "v": 96.2, "num": 25, "den": 26}, {"date": "2026-05-06", "v": 94.3, "num": 33, "den": 35}, {"date": "2026-05-07", "v": 95.0, "num": 19, "den": 20}, {"date": "2026-05-08", "v": 93.3, "num": 28, "den": 30}, {"date": "2026-05-09", "v": 89.8, "num": 44, "den": 49}, {"date": "2026-05-10", "v": 92.3, "num": 24, "den": 26}, {"date": "2026-05-11", "v": 94.3, "num": 33, "den": 35}, {"date": "2026-05-12", "v": 82.9, "num": 29, "den": 35}, {"date": "2026-05-13", "v": 96.8, "num": 30, "den": 31}, {"date": "2026-05-14", "v": 92.9, "num": 26, "den": 28}, {"date": "2026-05-15", "v": 83.9, "num": 26, "den": 31}, {"date": "2026-05-16", "v": 85.7, "num": 24, "den": 28}, {"date": "2026-05-17", "v": 96.6, "num": 28, "den": 29}, {"date": "2026-05-18", "v": 85.2, "num": 23, "den": 27}, {"date": "2026-05-19", "v": 87.1, "num": 27, "den": 31}, {"date": "2026-05-20", "v": 87.5, "num": 21, "den": 24}]}, "new_d1": {"legacy": null, "band": null, "legacyLabel": null, "gran": "weekly", "agg": "sum", "toggle": false, "points": [{"date": "2026-03-30", "v": 85.7, "num": 96, "den": 112}, {"date": "2026-04-06", "v": 89.6, "num": 266, "den": 297}, {"date": "2026-04-13", "v": 90.6, "num": 222, "den": 245}, {"date": "2026-04-20", "v": 87.3, "num": 178, "den": 204}, {"date": "2026-04-27", "v": 84.4, "num": 162, "den": 192}, {"date": "2026-05-04", "v": 88.2, "num": 195, "den": 221}, {"date": "2026-05-11", "v": 84.7, "num": 199, "den": 235}, {"date": "2026-05-18", "v": 85.1, "num": 171, "den": 201}, {"date": "2026-05-25", "v": 83.9, "num": 141, "den": 168}, {"date": "2026-06-01", "v": 83.9, "num": 151, "den": 180}, {"date": "2026-06-08", "v": 89.8, "num": 212, "den": 236}, {"date": "2026-06-15", "v": 88.9, "num": 193, "den": 217}, {"date": "2026-06-22", "v": 90.1, "num": 64, "den": 71}]}, "ten_nsm": {"legacy": 90, "band": [85, 95], "legacyLabel": "Legacy 85\u201395%", "gran": "daily", "agg": "sample", "toggle": true, "points": [{"date": "2026-05-03", "v": 87.9, "num": 111026, "den": 126380}, {"date": "2026-05-04", "v": 87.8, "num": 110692, "den": 126095}, {"date": "2026-05-05", "v": 87.7, "num": 110345, "den": 125830}, {"date": "2026-05-06", "v": 87.6, "num": 110039, "den": 125552}, {"date": "2026-05-07", "v": 87.6, "num": 109698, "den": 125187}, {"date": "2026-05-08", "v": 87.6, "num": 109416, "den": 124841}, {"date": "2026-05-09", "v": 87.7, "num": 109214, "den": 124517}, {"date": "2026-05-10", "v": 87.8, "num": 109037, "den": 124230}, {"date": "2026-05-11", "v": 87.8, "num": 108778, "den": 123858}, {"date": "2026-05-12", "v": 87.9, "num": 108529, "den": 123505}, {"date": "2026-05-13", "v": 88.0, "num": 108305, "den": 123128}, {"date": "2026-05-14", "v": 88.0, "num": 107921, "den": 122591}, {"date": "2026-05-15", "v": 88.1, "num": 107562, "den": 122128}, {"date": "2026-05-16", "v": 88.1, "num": 107038, "den": 121496}, {"date": "2026-05-17", "v": 88.2, "num": 106677, "den": 121003}, {"date": "2026-05-18", "v": 88.2, "num": 106362, "den": 120567}, {"date": "2026-05-19", "v": 88.3, "num": 105998, "den": 120088}, {"date": "2026-05-20", "v": 88.3, "num": 105659, "den": 119599}, {"date": "2026-05-21", "v": 88.5, "num": 105340, "den": 119052}, {"date": "2026-05-22", "v": 88.5, "num": 105003, "den": 118590}, {"date": "2026-05-23", "v": 88.4, "num": 104449, "den": 118100}, {"date": "2026-05-24", "v": 88.5, "num": 104218, "den": 117713}, {"date": "2026-05-25", "v": 88.5, "num": 103861, "den": 117314}, {"date": "2026-05-26", "v": 88.6, "num": 103570, "den": 116935}, {"date": "2026-05-27", "v": 88.6, "num": 103192, "den": 116523}, {"date": "2026-05-28", "v": 88.6, "num": 102900, "den": 116174}, {"date": "2026-05-29", "v": 88.6, "num": 102577, "den": 115816}, {"date": "2026-05-30", "v": 88.6, "num": 102277, "den": 115469}, {"date": "2026-05-31", "v": 88.6, "num": 102083, "den": 115164}, {"date": "2026-06-01", "v": 88.6, "num": 101766, "den": 114813}, {"date": "2026-06-02", "v": 88.7, "num": 101519, "den": 114464}, {"date": "2026-06-03", "v": 88.7, "num": 101247, "den": 114122}, {"date": "2026-06-04", "v": 88.8, "num": 100976, "den": 113746}, {"date": "2026-06-05", "v": 88.8, "num": 100685, "den": 113419}, {"date": "2026-06-06", "v": 88.8, "num": 100421, "den": 113051}, {"date": "2026-06-07", "v": 88.9, "num": 100191, "den": 112742}, {"date": "2026-06-08", "v": 88.8, "num": 99934, "den": 112491}, {"date": "2026-06-09", "v": 88.8, "num": 99712, "den": 112270}, {"date": "2026-06-10", "v": 88.9, "num": 99553, "den": 111993}, {"date": "2026-06-11", "v": 88.9, "num": 99314, "den": 111716}, {"date": "2026-06-12", "v": 88.9, "num": 99122, "den": 111440}, {"date": "2026-06-13", "v": 88.9, "num": 98785, "den": 111106}, {"date": "2026-06-14", "v": 88.8, "num": 98410, "den": 110769}, {"date": "2026-06-15", "v": 88.8, "num": 97944, "den": 110312}, {"date": "2026-06-16", "v": 88.8, "num": 97648, "den": 109990}, {"date": "2026-06-17", "v": 88.7, "num": 97258, "den": 109668}, {"date": "2026-06-18", "v": 88.7, "num": 96958, "den": 109329}, {"date": "2026-06-19", "v": 88.6, "num": 96658, "den": 109056}, {"date": "2026-06-20", "v": 88.5, "num": 96225, "den": 108772}, {"date": "2026-06-21", "v": 88.5, "num": 95973, "den": 108476}, {"date": "2026-06-22", "v": 88.5, "num": 95562, "den": 107945}, {"date": "2026-06-23", "v": 88.4, "num": 95269, "den": 107735}, {"date": "2026-06-24", "v": 88.3, "num": 94861, "den": 107411}, {"date": "2026-06-25", "v": 88.2, "num": 94487, "den": 107150}, {"date": "2026-06-26", "v": 88.2, "num": 94166, "den": 106821}, {"date": "2026-06-27", "v": 87.9, "num": 93714, "den": 106559}, {"date": "2026-06-28", "v": 87.8, "num": 93287, "den": 106285}, {"date": "2026-06-29", "v": 87.7, "num": 92934, "den": 105994}, {"date": "2026-06-30", "v": 87.6, "num": 92667, "den": 105799}, {"date": "2026-07-01", "v": 87.6, "num": 92395, "den": 105486}, {"date": "2026-07-02", "v": 87.5, "num": 92125, "den": 105252}]}, "oneday": {"legacy": null, "band": null, "legacyLabel": null, "gran": "weekly", "agg": "sum", "toggle": false, "points": [{"date": "2026-03-30", "v": 9.0, "num": 1161, "den": 12866}, {"date": "2026-04-06", "v": 8.6, "num": 2879, "den": 33313}, {"date": "2026-04-13", "v": 9.7, "num": 2915, "den": 30128}, {"date": "2026-04-20", "v": 10.7, "num": 3115, "den": 29185}, {"date": "2026-04-27", "v": 12.3, "num": 3921, "den": 31928}, {"date": "2026-05-04", "v": 11.7, "num": 4011, "den": 34420}, {"date": "2026-05-11", "v": 13.0, "num": 4323, "den": 33247}, {"date": "2026-05-18", "v": 15.4, "num": 4954, "den": 32173}, {"date": "2026-05-25", "v": 17.2, "num": 5573, "den": 32363}, {"date": "2026-06-01", "v": 17.4, "num": 6344, "den": 36395}, {"date": "2026-06-08", "v": 19.6, "num": 6614, "den": 33703}, {"date": "2026-06-15", "v": 21.3, "num": 6731, "den": 31561}, {"date": "2026-06-22", "v": 23.5, "num": 7428, "den": 31545}, {"date": "2026-06-29", "v": 22.3, "num": 4398, "den": 19706}]}};
 const ACC={new_nsm:'#14284a',new_d1:'#1f7a70',ten_nsm:'#14284a',oneday:'#c68a1a'};
 const GOODDOWN={oneday:true};
 const NAME={new_nsm:'Day-43 retention',new_d1:'First-paid conversion',ten_nsm:'Active-base retention',oneday:'1-day plan %'};
 const PANEL={new_nsm:'new',new_d1:'new',ten_nsm:'ten',oneday:'ten'};
+const MO=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 let cur={new:null,ten:null};
+let gran={new_nsm:'daily',new_d1:'weekly',ten_nsm:'daily',oneday:'weekly'};
+function lbl(ds){return MO[+ds.slice(5,7)-1]+' '+ds.slice(8,10);}
+function isoMon(ds){const d=new Date(ds+'T00:00:00');const wd=(d.getDay()+6)%7;d.setDate(d.getDate()-wd);return d.toISOString().slice(0,10);}
+function getPoints(k){const s=SER[k];
+  if(s.gran==='weekly'||gran[k]==='daily') return s.points.map(p=>({x:lbl(p.date),v:p.v,n:p.den}));
+  const m={};s.points.forEach(p=>{const w=isoMon(p.date);(m[w]=m[w]||[]).push(p);});
+  return Object.keys(m).sort().map(w=>{const g=m[w];
+    if(s.agg==='sum'){let nu=0,de=0;g.forEach(p=>{nu+=p.num;de+=p.den;});return {x:lbl(w),v:Math.round(nu*1000/de)/10,n:de};}
+    const lp=g[g.length-1];return {x:lbl(lp.date),v:lp.v,n:lp.den};});
+}
 function showPart(p){document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('on',t.dataset.p===p));
   document.querySelectorAll('.part').forEach(x=>x.classList.toggle('on',x.id==='part-'+p));}
 function showTrend(k){
-  const p=PANEL[k], panel=document.getElementById('panel-'+p), chartId=(p==='new'?'chart':'chart2');
+  const p=PANEL[k], panel=document.getElementById('panel-'+p);
   document.querySelectorAll('#part-'+p+' .metric').forEach(m=>m.classList.toggle('active',m.dataset.k===k));
   if(cur[p]===k){panel.classList.remove('open');document.querySelectorAll('#part-'+p+' .metric').forEach(m=>m.classList.remove('active'));cur[p]=null;return;}
-  cur[p]=k; const s=SER[k], pts=s.points, last=pts[pts.length-1], prev=pts[pts.length-2];
-  document.getElementById('pt-'+p).innerHTML=NAME[k]+' <small>· '+(s.type==='monthly'?'monthly':'weekly')+'</small>';
+  cur[p]=k;
+  document.getElementById('pg-'+p).innerHTML = SER[k].toggle
+    ? `<button class='gbtn ${gran[k]==='daily'?'on':''}' onclick="setGran('${k}','daily')">Daily</button><button class='gbtn ${gran[k]==='weekly'?'on':''}' onclick="setGran('${k}','weekly')">Weekly</button>` : '';
+  render(k); panel.classList.add('open');
+}
+function setGran(k,g){gran[k]=g;const p=PANEL[k];
+  document.getElementById('pg-'+p).querySelectorAll('.gbtn').forEach(b=>b.classList.toggle('on',b.textContent.toLowerCase()===g));
+  render(k);}
+function render(k){const p=PANEL[k],s=SER[k],pts=getPoints(k),last=pts[pts.length-1],prev=pts[pts.length-2];
+  document.getElementById('pt-'+p).innerHTML=NAME[k]+" <small>· "+(s.toggle?gran[k]:s.gran)+"</small>";
   const dEl=document.getElementById('pd-'+p);
   if(prev){const dv=last.v-prev.v,imp=GOODDOWN[k]?(dv<0):(dv>0);dEl.className='pdelta '+(imp?'up':'down');dEl.textContent=(dv>0?'+':'')+dv.toFixed(1)+'pp';} else dEl.textContent='';
-  document.getElementById(chartId).innerHTML=chart(s,ACC[k]); panel.classList.add('open');
+  document.getElementById(p==='new'?'chart':'chart2').innerHTML=chart(s,ACC[k],pts);
 }
-function chart(s,acc){
+function chart(s,acc,pts){
   const W=1040,H=230,pl=42,pr=130,pt=20,pb=36,iw=W-pl-pr,ih=H-pt-pb;
-  const vals=s.points.map(p=>p.v).concat(s.legacy?[s.legacy]:[]).concat(s.band||[]);
+  const vals=pts.map(p=>p.v).concat(s.legacy?[s.legacy]:[]).concat(s.band||[]);
   let mn=Math.min(...vals),mx=Math.max(...vals);const pad=Math.max(1,(mx-mn)*0.25);mn=Math.floor(mn-pad);mx=Math.ceil(mx+pad);
-  const n=s.points.length,X=i=>pl+(n===1?iw/2:iw*i/(n-1)),Y=v=>pt+ih*(1-(v-mn)/(mx-mn));let g='';
+  const n=pts.length,X=i=>pl+(n===1?iw/2:iw*i/(n-1)),Y=v=>pt+ih*(1-(v-mn)/(mx-mn));let g='';
   for(let k=0;k<=4;k++){const val=mn+(mx-mn)*k/4,y=Y(val);g+=`<line x1='${pl}' y1='${y}' x2='${pl+iw}' y2='${y}' stroke='#eef1f6'/><text x='${pl-8}' y='${y+3}' font-size='10' fill='#93a1b5' text-anchor='end'>${val.toFixed(0)}%</text>`;}
   if(s.band){const y1=Y(s.band[1]),y2=Y(s.band[0]);g+=`<rect x='${pl}' y='${y1}' width='${iw}' height='${y2-y1}' fill='#1f7a70' opacity='.06'/>`;}
   if(s.legacy){const y=Y(s.legacy);g+=`<line x1='${pl}' y1='${y}' x2='${pl+iw}' y2='${y}' stroke='#8a97ab' stroke-width='1.4' stroke-dasharray='5 4'/><text x='${pl+iw+8}' y='${y+3}' font-size='10.5' fill='#5b6b82'>${s.legacyLabel}</text>`;}
-  let d='';s.points.forEach((p,i)=>{d+=(i?'L':'M')+X(i)+' '+Y(p.v)+' ';});g+=`<path d='${d}' fill='none' stroke='${acc}' stroke-width='2.4'/>`;
-  s.points.forEach((p,i)=>{const x=X(i),y=Y(p.v),lastp=i===n-1,fill=p.partial?'#fff':acc,r=lastp?5:3.5;
-    g+=`<circle cx='${x}' cy='${y}' r='${r}' fill='${fill}' stroke='${acc}' stroke-width='${p.partial?1.5:1}'><title>${p.x} · ${p.v}% · n=${p.n}</title></circle>`;
-    if(lastp||i===0||n<=6)g+=`<text x='${x}' y='${y-9}' font-size='10.5' font-weight='700' fill='${acc}' text-anchor='middle'>${p.v}%</text>`;
-    if(n<=8||i%2===0||lastp)g+=`<text x='${x}' y='${H-12}' font-size='9.5' fill='#93a1b5' text-anchor='middle'>${p.x}</text>`;});
+  let d='';pts.forEach((p,i)=>{d+=(i?'L':'M')+X(i)+' '+Y(p.v)+' ';});g+=`<path d='${d}' fill='none' stroke='${acc}' stroke-width='2.2'/>`;
+  const step=Math.max(1,Math.ceil(n/9)),rr=n>24?2:3.4;
+  pts.forEach((p,i)=>{const x=X(i),y=Y(p.v),lastp=i===n-1;
+    g+=`<circle cx='${x}' cy='${y}' r='${lastp?5:rr}' fill='${acc}'><title>${p.x} · ${p.v}% · n=${p.n}</title></circle>`;
+    if(lastp||i===0)g+=`<text x='${x}' y='${y-9}' font-size='10.5' font-weight='700' fill='${acc}' text-anchor='${lastp?'end':'start'}'>${p.v}%</text>`;
+    if(lastp||i%step===0)g+=`<text x='${x}' y='${H-12}' font-size='9' fill='#93a1b5' text-anchor='middle'>${p.x}</text>`;});
   return `<svg viewBox='0 0 ${W} ${H}' width='100%'>${g}</svg>`;
 }
 </script></body></html>
