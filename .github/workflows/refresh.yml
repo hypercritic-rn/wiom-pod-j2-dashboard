@@ -1,0 +1,44 @@
+name: Refresh dashboard
+
+# Private repo, no public Pages. Each run rebuilds index.html + dashboard_data.json
+# from live Metabase and commits them back to the repo. View by pulling the repo
+# and opening index.html, or point an internal server at it.
+
+on:
+  schedule:
+    - cron: "0 2 * * *"        # 02:00 UTC = 07:30 IST, daily
+  workflow_dispatch: {}         # manual "Run workflow" button
+
+permissions:
+  contents: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Pull data + build HTML
+        env:
+          METABASE_KEY: ${{ secrets.METABASE_KEY }}   # add in repo Settings > Secrets
+          METABASE_URL: https://metabase.wiom.in
+        run: |
+          export AS_OF="$(date -u -d '+330 minutes' '+%d %b %Y')"
+          python refresh.py
+          python build.py
+
+      - name: Commit refreshed data
+        run: |
+          git config user.name  "pod-refresh-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add index.html dashboard_data.json
+          if git diff --cached --quiet; then
+            echo "No changes."
+          else
+            git commit -m "Daily refresh: $(date -u -d '+330 minutes' '+%Y-%m-%d %H:%M IST')"
+            git push
+          fi
