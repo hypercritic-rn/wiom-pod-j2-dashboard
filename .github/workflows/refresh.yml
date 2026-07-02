@@ -1,19 +1,28 @@
 name: Refresh dashboard
 
-# Public repo with Pages. Each run rebuilds index.html + dashboard_data.json from
-# live Metabase and commits them to main; Pages serves index.html at the repo root.
+# Public Pages via GitHub Actions (no Jekyll). Each run pulls live Metabase,
+# rebuilds index.html, and deploys it straight to Pages.
 
 on:
   schedule:
     - cron: "0 2 * * *"        # 02:00 UTC = 07:30 IST, daily
-  workflow_dispatch: {}         # manual "Run workflow" button
+  workflow_dispatch: {}
 
 permissions:
-  contents: write
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
 
 jobs:
-  refresh:
+  build-deploy:
     runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
 
@@ -23,21 +32,19 @@ jobs:
 
       - name: Pull data + build HTML
         env:
-          METABASE_KEY: ${{ secrets.METABASE_KEY }}   # add in repo Settings > Secrets
+          METABASE_KEY: ${{ secrets.METABASE_KEY }}
           METABASE_URL: https://metabase.wiom.in
         run: |
           export AS_OF="$(date -u -d '+330 minutes' '+%d %b %Y')"
           python refresh.py
           python build.py
+          mkdir -p site
+          cp index.html dashboard_data.json site/
+          touch site/.nojekyll
 
-      - name: Commit refreshed data
-        run: |
-          git config user.name  "pod-refresh-bot"
-          git config user.email "actions@users.noreply.github.com"
-          git add index.html dashboard_data.json
-          if git diff --cached --quiet; then
-            echo "No changes."
-          else
-            git commit -m "Daily refresh: $(date -u -d '+330 minutes' '+%Y-%m-%d %H:%M IST')"
-            git push
-          fi
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+      - id: deploy
+        uses: actions/deploy-pages@v4
