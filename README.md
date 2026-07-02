@@ -4,7 +4,7 @@ A two-part dashboard (new-customer journey + tenured base) that refreshes daily 
 
 - `refresh.py` — queries Metabase, writes `dashboard_data.json` (rolling windows relative to today, IST). No third-party packages, standard library only.
 - `build.py` — reads `dashboard_data.json`, writes `index.html`.
-- `.github/workflows/refresh.yml` — runs both daily (02:00 UTC / 07:30 IST) and commits the refreshed `index.html` + `dashboard_data.json` back to this private repo (no public Pages).
+- `.github/workflows/refresh.yml` — runs both daily (02:00 UTC / 07:30 IST) and commits the refreshed `index.html` + `dashboard_data.json` to `main`; GitHub Pages serves it. Live at https://hypercritic-rn.github.io/wiom-pod-j2-dashboard/
 
 ## Metrics
 
@@ -28,7 +28,7 @@ python build.py
 # open index.html
 ```
 
-## Requirements before this can go live
+## Notes
 
-- **Metabase must be reachable from GitHub's cloud runners.** If `metabase.wiom.in` is VPN/internal-only, a GitHub-hosted runner cannot reach it — use a self-hosted runner inside the network, or run `refresh.py` on an internal box and commit the output.
-- **GitHub Pages URLs are public** regardless of repo visibility (except GitHub Enterprise with access control). This page shows internal retention and customer counts, so confirm that is acceptable before publishing, or host privately.
+- This repo is **public** and the Pages site shows internal retention rates and customer counts. That was a deliberate choice.
+- **Metabase must be reachable from GitHub's cloud runners.** If `metabase.wiom.in` is VPN/internal-only, the daily GitHub run cannot reach it — Pages still serves the last committed `index.html`, but auto-refresh won't update it. In that case run `refresh.py` on an internal machine on a schedule and push.

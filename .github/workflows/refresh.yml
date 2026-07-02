@@ -1,8 +1,7 @@
 name: Refresh dashboard
 
-# Private repo, no public Pages. Each run rebuilds index.html + dashboard_data.json
-# from live Metabase and commits them back to the repo. View by pulling the repo
-# and opening index.html, or point an internal server at it.
+# Public repo with Pages. Each run rebuilds index.html + dashboard_data.json from
+# live Metabase and commits them to main; Pages serves index.html at the repo root.
 
 on:
   schedule:
