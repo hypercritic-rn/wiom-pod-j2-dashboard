@@ -22,9 +22,11 @@ def series(rows):
              "num":int(float(r.get("num",r["den"]))),"den":int(float(r["den"]))} for r in rows]
 
 # ---- assemble the two parts ----
-nsm_new = D["new_nsm_headline"]; d1 = D["new_d1_headline"]
+nsm_new = D["new_nsm_daily"][-2]   # yesterday's matured day-43 cohort (last point is today, incomplete)
+d1 = D["new_d1_headline"]
 d2 = D["new_d2_buckets"]
-ten = D["ten_nsm_headline"]; tdrv = D["ten_driver_buckets"]
+ten = D["ten_nsm_daily"][-2]       # yesterday's rolling-30 active-base value
+tdrv = D["ten_driver_buckets"]
 gad = D["guard_activedays"]; g1d = D["guard_oneday_headline"]
 
 SER = {
@@ -56,14 +58,14 @@ def kpi(key, tier, accent, name, val, det, sub, trend=True):
 
 # Part 1 cards
 p1 = kpi("new_nsm","NSM · Day 43",NAVY,"Day-43 retention",f"{float(nsm_new['pct']):.1f}%",
-         f"{num(nsm_new['num'])} of {num(nsm_new['den'])} installs active at day 43","Owner: activation")
+         f"{num(nsm_new['num'])} of {num(nsm_new['den'])} in yesterday's day-43 cohort","Owner: activation")
 p1 += kpi("new_d1","Driver · convert",TEAL,"First-paid conversion",f"{float(d1['pct']):.1f}%",
           f"{num(d1['num'])} of {num(d1['den'])} convert in 7d · {float(d1['same_day']):.0f}% same-day","Leading, ~9-day lag")
 p1_d2 = bars(d2, TEAL)
 
 # Part 2 cards
-p2 = kpi("ten_nsm","NSM · monthly",NAVY,"Active-base retention",f"{float(ten['pct']):.1f}%",
-         f"{num(ten['num'])} of {num(ten['den'])} tenured still active","Owner: retention")
+p2 = kpi("ten_nsm","NSM · yesterday",NAVY,"Active-base retention",f"{float(ten['pct']):.1f}%",
+         f"{num(ten['num'])} of {num(ten['den'])} tenured active yesterday","Owner: retention")
 p2_drv = bars(tdrv, NAVY)
 g_html = f"""<div class="metric notrend" style="--a:{GOLD}">
     <div class="mtier">Guardrail</div><div class="mname">% active days</div><div class="msub">Tenured active base</div>
