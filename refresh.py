@@ -116,23 +116,7 @@ GROUP BY 1 ORDER BY 1"""
 data["new_d2_daily"] = rows(*run(q_d30("daily")))
 data["new_d2_headline"] = rows(*run(q_d30("headline")))[0]
 
-# ---------- NEW INPUTS: usage, payment success, nudge ----------
-def q_usage(wk):
-    grp="TO_CHAR(DATE_TRUNC('week',install_dt),'YYYY-MM-DD') wk," if wk else "'hdln' wk,"
-    lo=f"DATEADD(day,-90,{T})" if wk else f"DATEADD(day,-33,{T})"
-    return f"""
-WITH base AS (SELECT router_nas_id, transaction_id, DATEADD(minute,330,otp_issued_time) start_ist,
-   ROW_NUMBER() OVER (PARTITION BY router_nas_id ORDER BY otp_issued_time) rn FROM t_router_user_mapping WHERE {STD}),
-installs AS (SELECT router_nas_id, CAST(start_ist AS DATE) install_dt FROM base
-   WHERE rn=1 AND transaction_id ILIKE '%booking_payment%' AND CAST(start_ist AS DATE) BETWEEN {lo} AND DATEADD(day,-7,{T}))
-SELECT {grp} COUNT(*) den,
-  SUM(CASE WHEN u.TRIAL_GB>=1 THEN 1 ELSE 0 END) num,
-  ROUND(SUM(CASE WHEN u.TRIAL_GB>=1 THEN 1 ELSE 0 END)*100.0/COUNT(*),1) pct
-FROM installs i LEFT JOIN DBT.FCT_FREE_TRIAL_USAGE_GB u ON u.ROUTER_NAS_ID=i.router_nas_id
-GROUP BY 1 ORDER BY 1"""
-data["in_usage_weekly"]=rows(*run(q_usage(True)))
-data["in_usage_headline"]=rows(*run(q_usage(False)))[0]
-
+# ---------- NEW INPUTS: payment success, nudge ----------
 def q_pay(wk):
     grp="TO_CHAR(DATE_TRUNC('week',TO_DATE(TIMESTAMP)),'YYYY-MM-DD') wk," if wk else "'hdln' wk,"
     lo=f"DATEADD(day,-90,{T})" if wk else f"DATEADD(day,-30,{T})"
