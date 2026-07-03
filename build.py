@@ -171,7 +171,7 @@ html = f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
  <div class="notes"><ul>
    <li>Base = all Home broadband (store_group_id=0), every plan type (PAYG, legacy, migrated). Standard trum filters, IST. Only split is tenure (new &lt;43d / tenured).</li>
    <li>Active = plan live at the checkpoint or last plan ended within 15 days. New vs tenured split at 43 days from install.</li>
-   <li>Day-43 retention counts all installs, so non-converters count against it (headline = yesterday's cohort, with month-to-date beside it). Day-30 active is of converts only, plan-agnostic sustain. Conversion matures ~9 days after install.</li>
+   <li>Day-43 retention counts all installs, so non-converters count against it (headline = yesterday's cohort, with month-to-date beside it). Conversion matures ~9 days after install. Expiry-day renewals = on-time renewal rate of new customers' paid plans (headline = 28-day bucket).</li>
    <li>Expiry-day renewals read per plan bucket, never blended. Windows roll on the last 30 days / matured cohorts.</li>
    <li>Refreshed daily from Metabase. Not yet cross-checked against an existing Metabase dashboard.</li>
  </ul></div>
