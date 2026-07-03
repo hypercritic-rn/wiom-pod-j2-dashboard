@@ -116,6 +116,45 @@ GROUP BY 1 ORDER BY 1"""
 data["new_d2_daily"] = rows(*run(q_d30("daily")))
 data["new_d2_headline"] = rows(*run(q_d30("headline")))[0]
 
+# ---------- NEW INPUTS: usage, payment success, nudge ----------
+def q_usage(wk):
+    grp="TO_CHAR(DATE_TRUNC('week',install_dt),'YYYY-MM-DD') wk," if wk else "'hdln' wk,"
+    lo=f"DATEADD(day,-90,{T})" if wk else f"DATEADD(day,-33,{T})"
+    return f"""
+WITH base AS (SELECT router_nas_id, transaction_id, DATEADD(minute,330,otp_issued_time) start_ist,
+   ROW_NUMBER() OVER (PARTITION BY router_nas_id ORDER BY otp_issued_time) rn FROM t_router_user_mapping WHERE {STD}),
+installs AS (SELECT router_nas_id, CAST(start_ist AS DATE) install_dt FROM base
+   WHERE rn=1 AND transaction_id ILIKE '%booking_payment%' AND CAST(start_ist AS DATE) BETWEEN {lo} AND DATEADD(day,-7,{T}))
+SELECT {grp} COUNT(*) den,
+  SUM(CASE WHEN u.TRIAL_GB>=1 THEN 1 ELSE 0 END) num,
+  ROUND(SUM(CASE WHEN u.TRIAL_GB>=1 THEN 1 ELSE 0 END)*100.0/COUNT(*),1) pct
+FROM installs i LEFT JOIN DBT.FCT_FREE_TRIAL_USAGE_GB u ON u.ROUTER_NAS_ID=i.router_nas_id
+GROUP BY 1 ORDER BY 1"""
+data["in_usage_weekly"]=rows(*run(q_usage(True)))
+data["in_usage_headline"]=rows(*run(q_usage(False)))[0]
+
+def q_pay(wk):
+    grp="TO_CHAR(DATE_TRUNC('week',TO_DATE(TIMESTAMP)),'YYYY-MM-DD') wk," if wk else "'hdln' wk,"
+    lo=f"DATEADD(day,-90,{T})" if wk else f"DATEADD(day,-30,{T})"
+    return f"""
+SELECT {grp}
+  SUM(CASE WHEN EVENT_NAME='checkout_page_loaded' THEN 1 ELSE 0 END) den,
+  SUM(CASE WHEN EVENT_NAME='payment_success_page_loaded' THEN 1 ELSE 0 END) num,
+  ROUND(SUM(CASE WHEN EVENT_NAME='payment_success_page_loaded' THEN 1 ELSE 0 END)*100.0
+        /NULLIF(SUM(CASE WHEN EVENT_NAME='checkout_page_loaded' THEN 1 ELSE 0 END),0),1) pct
+FROM public.CT_CUSTOMER_PAYG_PAYMENT_EVENTS_MV WHERE TO_DATE(TIMESTAMP) BETWEEN {lo} AND {T} GROUP BY 1 ORDER BY 1"""
+data["in_pay_weekly"]=rows(*run(q_pay(True)))
+data["in_pay_headline"]=rows(*run(q_pay(False)))[0]
+
+def q_nudge(wk):
+    grp="TO_CHAR(DATE_TRUNC('week',NUDGE_DATE),'YYYY-MM-DD') wk," if wk else "'hdln' wk,"
+    lo=f"DATEADD(day,-90,{T})" if wk else f"DATEADD(day,-30,{T})"
+    return f"""
+SELECT {grp} SUM(SENT) den, SUM(OPENED) num, ROUND(SUM(OPENED)*100.0/NULLIF(SUM(SENT),0),1) pct
+FROM DBT_CUSTOMER_POD.FCT_PRE_EXPIRY_NUDGE_DAILY WHERE NUDGE_DATE BETWEEN {lo} AND {T} GROUP BY 1 ORDER BY 1"""
+data["in_nudge_weekly"]=rows(*run(q_nudge(True)))
+data["in_nudge_headline"]=rows(*run(q_nudge(False)))[0]
+
 # ---------- TENURED NSM: active-base retention, rolling 30d, DAILY series ----------
 # For each report day D: active(D) / active(D-30), tenured (first_dt <= D-30-43).
 # A customer is active on day d if some plan covers [start, expiry+15] on d.

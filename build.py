@@ -8,7 +8,7 @@ def _lower(o):
     return o
 D = _lower(json.load(open(os.path.join(os.path.dirname(__file__),"dashboard_data.json"))))
 
-NAVY="#14284a"; TEAL="#1f7a70"; GOLD="#c68a1a"; RED="#c0392b"; SUB="#5b6b82"
+NAVY="#14284a"; TEAL="#1f7a70"; GOLD="#c68a1a"; RED="#c0392b"; SUB="#5b6b82"; INPUT="#6f5ec7"
 def num(n):
     try: return "{:,}".format(int(round(float(n))))
     except: return str(n)
@@ -34,6 +34,9 @@ SER = {
  "new_nsm": {"legacy":85,"band":None,"legacyLabel":"Legacy M1 ~85%","gran":"daily","agg":"sum","toggle":True,"points":series(D["new_nsm_daily"])},
  "new_d1":  {"legacy":None,"band":None,"legacyLabel":None,"gran":"weekly","agg":"sum","toggle":False,"points":series(D["new_d1_weekly"])},
  "new_d2":  {"legacy":None,"band":None,"legacyLabel":None,"gran":"daily","agg":"sum","toggle":True,"points":series(D["new_d2_daily"])},
+ "in_usage":{"legacy":None,"band":None,"legacyLabel":None,"gran":"weekly","agg":"sum","toggle":False,"points":series(D["in_usage_weekly"])},
+ "in_pay":  {"legacy":None,"band":None,"legacyLabel":None,"gran":"weekly","agg":"sum","toggle":False,"points":series(D["in_pay_weekly"])},
+ "in_nudge":{"legacy":None,"band":None,"legacyLabel":None,"gran":"weekly","agg":"sum","toggle":False,"points":series(D["in_nudge_weekly"])},
  "ten_nsm": {"legacy":90,"band":[85,95],"legacyLabel":"Legacy 85–95%","gran":"daily","agg":"sample","toggle":True,"points":series(D["ten_nsm_daily"])},
  "oneday":  {"legacy":None,"band":None,"legacyLabel":None,"gran":"weekly","agg":"sum","toggle":False,"points":series(D["guard_oneday_weekly"])},
 }
@@ -65,6 +68,15 @@ p1 += kpi("new_d1","Driver · convert",TEAL,"First-paid conversion",f"{float(d1[
           f"{num(d1['num'])} of {num(d1['den'])} convert in 7d · {float(d1['same_day']):.0f}% same-day","Leading, ~9-day lag")
 p1 += kpi("new_d2","Driver · sustain",TEAL,"Day-30 active",f"{float(d2['pct']):.1f}%",
           f"{num(d2['num'])} of {num(d2['den'])} converts still active at day 30","Plan-agnostic")
+
+# Part 1 inputs
+iu=D["in_usage_headline"]; ip=D["in_pay_headline"]; ind=D["in_nudge_headline"]
+p1_in  = kpi("in_usage","Input · usage",INPUT,"Free-trial usage",f"{float(iu['pct']):.1f}%",
+          f"{num(iu['num'])} of {num(iu['den'])} installs used ≥1 GB in trial","Value experienced → D1")
+p1_in += kpi("in_pay","Input · payment",INPUT,"Payment success",f"{float(ip['pct']):.1f}%",
+          f"{num(ip['num'])} of {num(ip['den'])} checkouts complete","Mechanical gate → D1/D2")
+p1_in += kpi("in_nudge","Input · nudge",INPUT,"Nudge open rate",f"{float(ind['pct']):.1f}%",
+          f"{num(ind['num'])} of {num(ind['den'])} reminders opened","Prompt landing → D2")
 
 # Part 2 cards
 p2 = kpi("ten_nsm","NSM · yesterday",NAVY,"Active-base retention",f"{float(ten['pct']):.1f}%",
@@ -137,6 +149,8 @@ html = f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
    <div class="panel" id="panel-new"><div class="pinner">
      <div class="phead"><div class="ptitle" id="pt-new"></div>
        <div class="pright"><span class="pgran" id="pg-new"></span><span class="pdelta" id="pd-new"></span></div></div><div id="chart"></div></div></div>
+   <div class="sec">Inputs — daily levers</div>
+   <div class="grid">{p1_in}</div>
  </div>
 
  <div class="part" id="part-ten">
@@ -160,13 +174,13 @@ html = f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
 </div>
 <script>
 const SER={ser_json};
-const ACC={{new_nsm:'{NAVY}',new_d1:'{TEAL}',new_d2:'{TEAL}',ten_nsm:'{NAVY}',oneday:'{GOLD}'}};
+const ACC={{new_nsm:'{NAVY}',new_d1:'{TEAL}',new_d2:'{TEAL}',in_usage:'{INPUT}',in_pay:'{INPUT}',in_nudge:'{INPUT}',ten_nsm:'{NAVY}',oneday:'{GOLD}'}};
 const GOODDOWN={{oneday:true}};
-const NAME={{new_nsm:'Day-43 retention',new_d1:'First-paid conversion',new_d2:'Day-30 active',ten_nsm:'Active-base retention',oneday:'1-day plan %'}};
-const PANEL={{new_nsm:'new',new_d1:'new',new_d2:'new',ten_nsm:'ten',oneday:'ten'}};
+const NAME={{new_nsm:'Day-43 retention',new_d1:'First-paid conversion',new_d2:'Day-30 active',in_usage:'Free-trial usage',in_pay:'Payment success',in_nudge:'Nudge open rate',ten_nsm:'Active-base retention',oneday:'1-day plan %'}};
+const PANEL={{new_nsm:'new',new_d1:'new',new_d2:'new',in_usage:'new',in_pay:'new',in_nudge:'new',ten_nsm:'ten',oneday:'ten'}};
 const MO=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 let cur={{new:null,ten:null}};
-let gran={{new_nsm:'daily',new_d1:'weekly',new_d2:'daily',ten_nsm:'daily',oneday:'weekly'}};
+let gran={{new_nsm:'daily',new_d1:'weekly',new_d2:'daily',in_usage:'weekly',in_pay:'weekly',in_nudge:'weekly',ten_nsm:'daily',oneday:'weekly'}};
 function lbl(ds){{return MO[+ds.slice(5,7)-1]+' '+ds.slice(8,10);}}
 function isoMon(ds){{const d=new Date(ds+'T00:00:00');const wd=(d.getDay()+6)%7;d.setDate(d.getDate()-wd);return d.toISOString().slice(0,10);}}
 function getPoints(k){{const s=SER[k];
