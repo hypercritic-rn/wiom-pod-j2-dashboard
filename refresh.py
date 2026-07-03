@@ -115,27 +115,22 @@ data["new_d2_buckets"] = rows(*run(q_newrenew("buckets")))
 data["new_d2_weekly"]  = rows(*run(q_newrenew("weekly")))
 
 # ---------- NEW INPUTS: payment success, nudge ----------
-def q_pay(wk):
-    grp="TO_CHAR(DATE_TRUNC('week',TO_DATE(TIMESTAMP)),'YYYY-MM-DD') wk," if wk else "'hdln' wk,"
+def q_pay(wk):  # NEW customers only: checkout->success for events within 43d of first recharge
+    grp="TO_CHAR(DATE_TRUNC('week',e.ed),'YYYY-MM-DD') wk," if wk else "'hdln' wk,"
     lo=f"DATEADD(day,-90,{T})" if wk else f"DATEADD(day,-30,{T})"
     return f"""
+WITH fr AS (SELECT router_nas_id, MIN(CAST(DATEADD(minute,330,otp_issued_time) AS DATE)) first_dt FROM t_router_user_mapping WHERE {STD} GROUP BY 1),
+e AS (SELECT TO_DATE(TIMESTAMP) ed, TRY_TO_NUMBER(NASID_LONG) nas, EVENT_NAME en
+   FROM public.CT_CUSTOMER_PAYG_PAYMENT_EVENTS_MV WHERE TO_DATE(TIMESTAMP) BETWEEN {lo} AND {T})
 SELECT {grp}
-  SUM(CASE WHEN EVENT_NAME='checkout_page_loaded' THEN 1 ELSE 0 END) den,
-  SUM(CASE WHEN EVENT_NAME='payment_success_page_loaded' THEN 1 ELSE 0 END) num,
-  ROUND(SUM(CASE WHEN EVENT_NAME='payment_success_page_loaded' THEN 1 ELSE 0 END)*100.0
-        /NULLIF(SUM(CASE WHEN EVENT_NAME='checkout_page_loaded' THEN 1 ELSE 0 END),0),1) pct
-FROM public.CT_CUSTOMER_PAYG_PAYMENT_EVENTS_MV WHERE TO_DATE(TIMESTAMP) BETWEEN {lo} AND {T} GROUP BY 1 ORDER BY 1"""
+  SUM(CASE WHEN e.en='checkout_page_loaded' THEN 1 ELSE 0 END) den,
+  SUM(CASE WHEN e.en='payment_success_page_loaded' THEN 1 ELSE 0 END) num,
+  ROUND(SUM(CASE WHEN e.en='payment_success_page_loaded' THEN 1 ELSE 0 END)*100.0
+        /NULLIF(SUM(CASE WHEN e.en='checkout_page_loaded' THEN 1 ELSE 0 END),0),1) pct
+FROM e JOIN fr ON fr.router_nas_id=e.nas WHERE DATEDIFF('day',fr.first_dt,e.ed) BETWEEN 0 AND 43
+GROUP BY 1 ORDER BY 1"""
 data["in_pay_weekly"]=rows(*run(q_pay(True)))
 data["in_pay_headline"]=rows(*run(q_pay(False)))[0]
-
-def q_nudge(wk):
-    grp="TO_CHAR(DATE_TRUNC('week',NUDGE_DATE),'YYYY-MM-DD') wk," if wk else "'hdln' wk,"
-    lo=f"DATEADD(day,-90,{T})" if wk else f"DATEADD(day,-30,{T})"
-    return f"""
-SELECT {grp} SUM(SENT) den, SUM(OPENED) num, ROUND(SUM(OPENED)*100.0/NULLIF(SUM(SENT),0),1) pct
-FROM DBT_CUSTOMER_POD.FCT_PRE_EXPIRY_NUDGE_DAILY WHERE NUDGE_DATE BETWEEN {lo} AND {T} GROUP BY 1 ORDER BY 1"""
-data["in_nudge_weekly"]=rows(*run(q_nudge(True)))
-data["in_nudge_headline"]=rows(*run(q_nudge(False)))[0]
 
 def q_appopen(wk):
     grp="TO_CHAR(DATE_TRUNC('week',exp_dt),'YYYY-MM-DD') wk," if wk else "'hdln' wk,"
