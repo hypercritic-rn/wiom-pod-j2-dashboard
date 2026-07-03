@@ -88,33 +88,31 @@ FROM free GROUP BY 1 ORDER BY 1"""
 data["new_d1_weekly"] = rows(*run(q_conv(True)))
 data["new_d1_headline"] = rows(*run(q_conv(False)))[0]
 
-# ---------- NEW Driver 2: Day-30 active retention OF CONVERTS (plan-agnostic sustain) ----------
-def q_d30(mode):
-    if mode=="daily":
-        grp="TO_CHAR(i.install_dt,'YYYY-MM-DD') wk,"; lo=f"DATEADD(day,-90,{T})"
+# ---------- NEW Driver 2: Expiry-day renewals (renewal rate) — new-customer paid expiries ----------
+def q_newrenew(mode):
+    if mode=="weekly":
+        sel="TO_CHAR(DATE_TRUNC('week',CAST(end_ist AS DATE)),'YYYY-MM-DD') wk,"; lo=f"DATEADD(day,-90,{T})"; extra="AND plan_days=28"
     else:
-        grp="'hdln' wk,"; lo=f"DATEADD(day,-60,{T})"
+        sel="CASE WHEN plan_days=1 THEN '1d' WHEN plan_days=7 THEN '7d' WHEN plan_days=28 THEN '28d' ELSE 'Other' END wk,"; lo=f"DATEADD(day,-30,{T})"; extra=""
     return f"""
-WITH pay AS (SELECT id,price FROM t_plan_configuration),
-base AS (SELECT router_nas_id, transaction_id, selected_plan_id,
-   DATEADD(minute,330,otp_issued_time) start_ist, DATEADD(minute,330,otp_expiry_time) end_ist,
-   ROW_NUMBER() OVER (PARTITION BY router_nas_id ORDER BY otp_issued_time) rn
+WITH pay AS (SELECT id,price,ROUND(time_limit/86400.0) days FROM t_plan_configuration),
+base AS (SELECT router_nas_id, selected_plan_id, created_on,
+   DATEADD(minute,330,otp_issued_time) start_ist, DATEADD(minute,330,otp_expiry_time) end_ist
    FROM t_router_user_mapping WHERE {STD}),
-installs AS (SELECT router_nas_id, CAST(start_ist AS DATE) install_dt, DATEADD(day,30,CAST(start_ist AS DATE)) day30
-   FROM base WHERE rn=1 AND transaction_id ILIKE '%booking_payment%'
-   AND CAST(start_ist AS DATE) BETWEEN {lo} AND DATEADD(day,-30,{T})),
-converts AS (SELECT DISTINCT b.router_nas_id FROM base b JOIN pay p ON b.selected_plan_id=p.id WHERE p.price>0),
-ls AS (SELECT i.router_nas_id, i.install_dt, i.day30,
-   MAX(CASE WHEN CAST(b.start_ist AS DATE)<=i.day30 THEN b.end_ist END) last_end
-   FROM installs i JOIN base b ON b.router_nas_id=i.router_nas_id GROUP BY 1,2,3)
-SELECT {grp} COUNT(DISTINCT c.router_nas_id) den,
-  COUNT(DISTINCT CASE WHEN ls.last_end>=DATEADD(day,-15,i.day30) THEN c.router_nas_id END) num,
-  ROUND(COUNT(DISTINCT CASE WHEN ls.last_end>=DATEADD(day,-15,i.day30) THEN c.router_nas_id END)*100.0
-        /NULLIF(COUNT(DISTINCT c.router_nas_id),0),1) pct
-FROM installs i JOIN converts c ON c.router_nas_id=i.router_nas_id JOIN ls ON ls.router_nas_id=i.router_nas_id
-GROUP BY 1 ORDER BY 1"""
-data["new_d2_daily"] = rows(*run(q_d30("daily")))
-data["new_d2_headline"] = rows(*run(q_d30("headline")))[0]
+fr AS (SELECT b.router_nas_id, MIN(CAST(b.start_ist AS DATE)) first_dt FROM base b JOIN pay p ON b.selected_plan_id=p.id GROUP BY 1),
+seq AS (SELECT b.router_nas_id, b.end_ist, p.days plan_days, p.price,
+   LEAD(b.start_ist) OVER (PARTITION BY b.router_nas_id ORDER BY b.start_ist) nxt,
+   ROW_NUMBER() OVER (PARTITION BY b.router_nas_id, CAST(b.end_ist AS DATE) ORDER BY b.created_on DESC) dpx
+   FROM base b JOIN pay p ON b.selected_plan_id=p.id),
+exp AS (SELECT s.end_ist, s.plan_days, DATEDIFF('day',s.end_ist,s.nxt) R,
+   DATEDIFF('day', f.first_dt, CAST(s.end_ist AS DATE)) tenure
+   FROM seq s JOIN fr f ON f.router_nas_id=s.router_nas_id
+   WHERE s.dpx=1 AND s.price>0 AND CAST(s.end_ist AS DATE) BETWEEN {lo} AND {T})
+SELECT {sel} COUNT(*) den, SUM(CASE WHEN R IS NOT NULL AND R<=0 THEN 1 ELSE 0 END) num,
+  ROUND(SUM(CASE WHEN R IS NOT NULL AND R<=0 THEN 1 ELSE 0 END)*100.0/COUNT(*),1) pct
+FROM exp WHERE tenure<=43 {extra} GROUP BY 1 ORDER BY 1"""
+data["new_d2_buckets"] = rows(*run(q_newrenew("buckets")))
+data["new_d2_weekly"]  = rows(*run(q_newrenew("weekly")))
 
 # ---------- NEW INPUTS: payment success, nudge ----------
 def q_pay(wk):
@@ -138,6 +136,28 @@ SELECT {grp} SUM(SENT) den, SUM(OPENED) num, ROUND(SUM(OPENED)*100.0/NULLIF(SUM(
 FROM DBT_CUSTOMER_POD.FCT_PRE_EXPIRY_NUDGE_DAILY WHERE NUDGE_DATE BETWEEN {lo} AND {T} GROUP BY 1 ORDER BY 1"""
 data["in_nudge_weekly"]=rows(*run(q_nudge(True)))
 data["in_nudge_headline"]=rows(*run(q_nudge(False)))[0]
+
+def q_appopen(wk):
+    grp="TO_CHAR(DATE_TRUNC('week',exp_dt),'YYYY-MM-DD') wk," if wk else "'hdln' wk,"
+    lo=f"DATEADD(day,-90,{T})" if wk else f"DATEADD(day,-30,{T})"
+    return f"""
+WITH pay AS (SELECT id,price FROM t_plan_configuration),
+base AS (SELECT router_nas_id, selected_plan_id, created_on,
+   DATEADD(minute,330,otp_issued_time) start_ist, DATEADD(minute,330,otp_expiry_time) end_ist
+   FROM t_router_user_mapping WHERE {STD}),
+fr AS (SELECT b.router_nas_id, MIN(CAST(b.start_ist AS DATE)) first_dt FROM base b JOIN pay p ON b.selected_plan_id=p.id GROUP BY 1),
+seq AS (SELECT b.router_nas_id, b.end_ist, p.price,
+   ROW_NUMBER() OVER (PARTITION BY b.router_nas_id, CAST(b.end_ist AS DATE) ORDER BY b.created_on DESC) dpx
+   FROM base b JOIN pay p ON b.selected_plan_id=p.id),
+enew AS (SELECT s.router_nas_id, CAST(s.end_ist AS DATE) exp_dt FROM seq s JOIN fr f ON f.router_nas_id=s.router_nas_id
+   WHERE s.dpx=1 AND s.price>0 AND CAST(s.end_ist AS DATE) BETWEEN {lo} AND {T} AND DATEDIFF('day',f.first_dt,CAST(s.end_ist AS DATE))<=43),
+opens AS (SELECT DISTINCT TRY_TO_NUMBER(NASIDLONG) nas, TO_DATE(TIMESTAMP) d FROM public.CT_CUSTOMER_APP_LAUNCH
+   WHERE TO_DATE(TIMESTAMP) BETWEEN DATEADD(day,-94,{T}) AND {T}),
+ew AS (SELECT e.router_nas_id, e.exp_dt, MAX(CASE WHEN o.nas IS NOT NULL THEN 1 ELSE 0 END) opened
+   FROM enew e LEFT JOIN opens o ON o.nas=e.router_nas_id AND o.d BETWEEN DATEADD(day,-3,e.exp_dt) AND e.exp_dt GROUP BY 1,2)
+SELECT {grp} COUNT(*) den, SUM(opened) num, ROUND(SUM(opened)*100.0/COUNT(*),1) pct FROM ew GROUP BY 1 ORDER BY 1"""
+data["in_appopen_weekly"]=rows(*run(q_appopen(True)))
+data["in_appopen_headline"]=rows(*run(q_appopen(False)))[0]
 
 # ---------- TENURED NSM: active-base retention, rolling 30d, DAILY series ----------
 # For each report day D: active(D) / active(D-30), tenured (first_dt <= D-30-43).

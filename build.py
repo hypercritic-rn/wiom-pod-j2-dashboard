@@ -25,29 +25,32 @@ def series(rows):
 nsm_new = D["new_nsm_daily"][-2]   # yesterday's matured day-43 cohort (last point is today, incomplete)
 nsm_mtd = D["new_nsm_mtd"]         # month-to-date through yesterday
 d1 = D["new_d1_headline"]
-d2 = D["new_d2_headline"]          # day-30 active retention of converts
+d2b = D["new_d2_buckets"]          # expiry-day renewals by plan bucket (new customers)
+d2 = next((r for r in d2b if r["wk"]=="28d"), d2b[0])   # 28-day bucket headline
 ten = D["ten_nsm_daily"][-2]       # yesterday's rolling-30 active-base value
 tdrv = D["ten_driver_buckets"]
 gad = D["guard_activedays"]; g1d = D["guard_oneday_headline"]
 
 SER = {
- "new_nsm": {"legacy":85,"band":None,"legacyLabel":"Legacy M1 ~85%","gran":"daily","agg":"sum","toggle":True,"points":series(D["new_nsm_daily"])},
- "new_d1":  {"legacy":None,"band":None,"legacyLabel":None,"gran":"weekly","agg":"sum","toggle":False,"points":series(D["new_d1_weekly"])},
- "new_d2":  {"legacy":None,"band":None,"legacyLabel":None,"gran":"daily","agg":"sum","toggle":True,"points":series(D["new_d2_daily"])},
- "in_pay":  {"legacy":None,"band":None,"legacyLabel":None,"gran":"weekly","agg":"sum","toggle":False,"points":series(D["in_pay_weekly"])},
- "in_nudge":{"legacy":None,"band":None,"legacyLabel":None,"gran":"weekly","agg":"sum","toggle":False,"points":series(D["in_nudge_weekly"])},
- "ten_nsm": {"legacy":90,"band":[85,95],"legacyLabel":"Legacy 85–95%","gran":"daily","agg":"sample","toggle":True,"points":series(D["ten_nsm_daily"])},
- "oneday":  {"legacy":None,"band":None,"legacyLabel":None,"gran":"weekly","agg":"sum","toggle":False,"points":series(D["guard_oneday_weekly"])},
+ "new_nsm": {"legacy":85,"band":None,"legacyLabel":"Legacy M1 ~85%","gran":"daily","agg":"sum","toggle":True,"basis":"cohorted by install date","points":series(D["new_nsm_daily"])},
+ "new_d1":  {"legacy":None,"band":None,"legacyLabel":None,"gran":"weekly","agg":"sum","toggle":False,"basis":"cohorted by free-trial-expiry date","points":series(D["new_d1_weekly"])},
+ "new_d2":  {"legacy":None,"band":None,"legacyLabel":None,"gran":"weekly","agg":"sum","toggle":False,"basis":"28-day plans, by expiry date","points":series(D["new_d2_weekly"])},
+ "in_pay":  {"legacy":None,"band":None,"legacyLabel":None,"gran":"weekly","agg":"sum","toggle":False,"basis":"by checkout event date","points":series(D["in_pay_weekly"])},
+ "in_nudge":{"legacy":None,"band":None,"legacyLabel":None,"gran":"weekly","agg":"sum","toggle":False,"basis":"by nudge send date","points":series(D["in_nudge_weekly"])},
+ "in_appopen":{"legacy":None,"band":None,"legacyLabel":None,"gran":"weekly","agg":"sum","toggle":False,"basis":"by plan-expiry date","points":series(D["in_appopen_weekly"])},
+ "ten_nsm": {"legacy":90,"band":[85,95],"legacyLabel":"Legacy 85–95%","gran":"daily","agg":"sample","toggle":True,"basis":"by report date (rolling 30d)","points":series(D["ten_nsm_daily"])},
+ "oneday":  {"legacy":None,"band":None,"legacyLabel":None,"gran":"weekly","agg":"sum","toggle":False,"basis":"by recharge date","points":series(D["guard_oneday_weekly"])},
 }
 
 def bars(rowset, accent):
     order={"1d":0,"7d":1,"28d":2,"Other":3}
-    rws=sorted(rowset,key=lambda r:order.get(r["bucket"],9))
+    bk=lambda r:r.get("bucket",r.get("wk"))
+    rws=sorted(rowset,key=lambda r:order.get(bk(r),9))
     mx=max(float(r["pct"]) for r in rws) or 1
     h=""
     for r in rws:
         p=float(r["pct"]); w=max(3,p/max(mx,60)*100)
-        h+=f"""<div class="bar"><div class="blab">{r['bucket']}</div>
+        h+=f"""<div class="bar"><div class="blab">{bk(r)}</div>
         <div class="btrk"><div class="bfill" style="width:{w:.0f}%;background:{accent}"></div></div>
         <div class="bval">{p:.1f}%<span class="bden">{num(r['num'])}/{num(r['den'])}</span></div></div>"""
     return h
@@ -65,15 +68,18 @@ p1 = kpi("new_nsm","NSM · Day 43 · daily",NAVY,"Day-43 retention",f"{float(nsm
          f"{num(nsm_new['num'])} of {num(nsm_new['den'])} yesterday · MTD {float(nsm_mtd['pct']):.1f}%","Owner: activation")
 p1 += kpi("new_d1","Driver · convert",TEAL,"First-paid conversion",f"{float(d1['pct']):.1f}%",
           f"{num(d1['num'])} of {num(d1['den'])} convert in 7d · {float(d1['same_day']):.0f}% same-day","Leading, ~9-day lag")
-p1 += kpi("new_d2","Driver · sustain",TEAL,"Day-30 active",f"{float(d2['pct']):.1f}%",
-          f"{num(d2['num'])} of {num(d2['den'])} converts still active at day 30","Plan-agnostic")
+p1 += kpi("new_d2","Driver · renew",TEAL,"Expiry-day renewals",f"{float(d2['pct']):.1f}%",
+          f"{num(d2['num'])} of {num(d2['den'])} 28-day plans renewed on time","Renewal rate · 28d shown")
+p1_d2bars = bars(d2b, TEAL)
 
 # Part 1 inputs
-ip=D["in_pay_headline"]; ind=D["in_nudge_headline"]
+ip=D["in_pay_headline"]; ind=D["in_nudge_headline"]; ia=D["in_appopen_headline"]
 p1_in  = kpi("in_pay","Input · payment",INPUT,"Payment success",f"{float(ip['pct']):.1f}%",
           f"{num(ip['num'])} of {num(ip['den'])} checkouts complete","Mechanical gate → D1/D2")
 p1_in += kpi("in_nudge","Input · nudge",INPUT,"Nudge open rate",f"{float(ind['pct']):.1f}%",
           f"{num(ind['num'])} of {num(ind['den'])} reminders opened","Prompt landing → D2")
+p1_in += kpi("in_appopen","Input · app open",INPUT,"App-open near expiry",f"{float(ia['pct']):.1f}%",
+          f"{num(ia['num'])} of {num(ia['den'])} open app ≤3d before expiry","Renewal intent → D2")
 
 # Part 2 cards
 p2 = kpi("ten_nsm","NSM · yesterday",NAVY,"Active-base retention",f"{float(ten['pct']):.1f}%",
@@ -146,6 +152,8 @@ html = f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
    <div class="panel" id="panel-new"><div class="pinner">
      <div class="phead"><div class="ptitle" id="pt-new"></div>
        <div class="pright"><span class="pgran" id="pg-new"></span><span class="pdelta" id="pd-new"></span></div></div><div id="chart"></div></div></div>
+   <div class="sec">Expiry-day renewals — by plan bucket (new customers)</div>
+   <div class="card">{p1_d2bars}</div>
    <div class="sec">Inputs — daily levers</div>
    <div class="grid">{p1_in}</div>
  </div>
@@ -171,13 +179,13 @@ html = f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
 </div>
 <script>
 const SER={ser_json};
-const ACC={{new_nsm:'{NAVY}',new_d1:'{TEAL}',new_d2:'{TEAL}',in_pay:'{INPUT}',in_nudge:'{INPUT}',ten_nsm:'{NAVY}',oneday:'{GOLD}'}};
+const ACC={{new_nsm:'{NAVY}',new_d1:'{TEAL}',new_d2:'{TEAL}',in_pay:'{INPUT}',in_nudge:'{INPUT}',in_appopen:'{INPUT}',ten_nsm:'{NAVY}',oneday:'{GOLD}'}};
 const GOODDOWN={{oneday:true}};
-const NAME={{new_nsm:'Day-43 retention',new_d1:'First-paid conversion',new_d2:'Day-30 active',in_pay:'Payment success',in_nudge:'Nudge open rate',ten_nsm:'Active-base retention',oneday:'1-day plan %'}};
-const PANEL={{new_nsm:'new',new_d1:'new',new_d2:'new',in_pay:'new',in_nudge:'new',ten_nsm:'ten',oneday:'ten'}};
+const NAME={{new_nsm:'Day-43 retention',new_d1:'First-paid conversion',new_d2:'Expiry-day renewals (28d)',in_pay:'Payment success',in_nudge:'Nudge open rate',in_appopen:'App-open near expiry',ten_nsm:'Active-base retention',oneday:'1-day plan %'}};
+const PANEL={{new_nsm:'new',new_d1:'new',new_d2:'new',in_pay:'new',in_nudge:'new',in_appopen:'new',ten_nsm:'ten',oneday:'ten'}};
 const MO=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 let cur={{new:null,ten:null}};
-let gran={{new_nsm:'daily',new_d1:'weekly',new_d2:'daily',in_pay:'weekly',in_nudge:'weekly',ten_nsm:'daily',oneday:'weekly'}};
+let gran={{new_nsm:'daily',new_d1:'weekly',new_d2:'weekly',in_pay:'weekly',in_nudge:'weekly',in_appopen:'weekly',ten_nsm:'daily',oneday:'weekly'}};
 function lbl(ds){{return MO[+ds.slice(5,7)-1]+' '+ds.slice(8,10);}}
 function isoMon(ds){{const d=new Date(ds+'T00:00:00');const wd=(d.getDay()+6)%7;d.setDate(d.getDate()-wd);return d.toISOString().slice(0,10);}}
 function getPoints(k){{const s=SER[k];
@@ -202,7 +210,7 @@ function setGran(k,g){{gran[k]=g;const p=PANEL[k];
   document.getElementById('pg-'+p).querySelectorAll('.gbtn').forEach(b=>b.classList.toggle('on',b.textContent.toLowerCase()===g));
   render(k);}}
 function render(k){{const p=PANEL[k],s=SER[k],pts=getPoints(k),last=pts[pts.length-1],prev=pts[pts.length-2];
-  document.getElementById('pt-'+p).innerHTML=NAME[k]+" <small>· "+(s.toggle?gran[k]:s.gran)+"</small>";
+  document.getElementById('pt-'+p).innerHTML=NAME[k]+" <small>· "+(s.toggle?gran[k]:s.gran)+" · "+(s.basis||'')+"</small>";
   const dEl=document.getElementById('pd-'+p);
   if(prev){{const dv=last.v-prev.v,imp=GOODDOWN[k]?(dv<0):(dv>0);dEl.className='pdelta '+(imp?'up':'down');dEl.textContent=(dv>0?'+':'')+dv.toFixed(1)+'pp';}} else dEl.textContent='';
   document.getElementById(p==='new'?'chart':'chart2').innerHTML=chart(s,ACC[k],pts);
