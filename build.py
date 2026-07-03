@@ -23,8 +23,9 @@ def series(rows):
 
 # ---- assemble the two parts ----
 nsm_new = D["new_nsm_daily"][-2]   # yesterday's matured day-43 cohort (last point is today, incomplete)
+nsm_mtd = D["new_nsm_mtd"]         # month-to-date through yesterday
 d1 = D["new_d1_headline"]
-d2 = D["new_d2_buckets"]
+d2 = D["new_d2_headline"]          # day-30 active retention of converts
 ten = D["ten_nsm_daily"][-2]       # yesterday's rolling-30 active-base value
 tdrv = D["ten_driver_buckets"]
 gad = D["guard_activedays"]; g1d = D["guard_oneday_headline"]
@@ -32,6 +33,7 @@ gad = D["guard_activedays"]; g1d = D["guard_oneday_headline"]
 SER = {
  "new_nsm": {"legacy":85,"band":None,"legacyLabel":"Legacy M1 ~85%","gran":"daily","agg":"sum","toggle":True,"points":series(D["new_nsm_daily"])},
  "new_d1":  {"legacy":None,"band":None,"legacyLabel":None,"gran":"weekly","agg":"sum","toggle":False,"points":series(D["new_d1_weekly"])},
+ "new_d2":  {"legacy":None,"band":None,"legacyLabel":None,"gran":"daily","agg":"sum","toggle":True,"points":series(D["new_d2_daily"])},
  "ten_nsm": {"legacy":90,"band":[85,95],"legacyLabel":"Legacy 85–95%","gran":"daily","agg":"sample","toggle":True,"points":series(D["ten_nsm_daily"])},
  "oneday":  {"legacy":None,"band":None,"legacyLabel":None,"gran":"weekly","agg":"sum","toggle":False,"points":series(D["guard_oneday_weekly"])},
 }
@@ -57,11 +59,12 @@ def kpi(key, tier, accent, name, val, det, sub, trend=True):
       <div class="mval">{val}</div><div class="mdet">{det}</div><div class="mcue">{cue}</div></div>"""
 
 # Part 1 cards
-p1 = kpi("new_nsm","NSM · Day 43",NAVY,"Day-43 retention",f"{float(nsm_new['pct']):.1f}%",
-         f"{num(nsm_new['num'])} of {num(nsm_new['den'])} in yesterday's day-43 cohort","Owner: activation")
+p1 = kpi("new_nsm","NSM · Day 43 · daily",NAVY,"Day-43 retention",f"{float(nsm_new['pct']):.1f}%",
+         f"{num(nsm_new['num'])} of {num(nsm_new['den'])} yesterday · MTD {float(nsm_mtd['pct']):.1f}%","Owner: activation")
 p1 += kpi("new_d1","Driver · convert",TEAL,"First-paid conversion",f"{float(d1['pct']):.1f}%",
           f"{num(d1['num'])} of {num(d1['den'])} convert in 7d · {float(d1['same_day']):.0f}% same-day","Leading, ~9-day lag")
-p1_d2 = bars(d2, TEAL)
+p1 += kpi("new_d2","Driver · sustain",TEAL,"Day-30 active",f"{float(d2['pct']):.1f}%",
+          f"{num(d2['num'])} of {num(d2['den'])} converts still active at day 30","Plan-agnostic")
 
 # Part 2 cards
 p2 = kpi("ten_nsm","NSM · yesterday",NAVY,"Active-base retention",f"{float(ten['pct']):.1f}%",
@@ -134,8 +137,6 @@ html = f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
    <div class="panel" id="panel-new"><div class="pinner">
      <div class="phead"><div class="ptitle" id="pt-new"></div>
        <div class="pright"><span class="pgran" id="pg-new"></span><span class="pdelta" id="pd-new"></span></div></div><div id="chart"></div></div></div>
-   <div class="sec">Driver 2 — first-renewal R0, by first-plan bucket</div>
-   <div class="card">{p1_d2}</div>
  </div>
 
  <div class="part" id="part-ten">
@@ -144,28 +145,28 @@ html = f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
    <div class="panel" id="panel-ten"><div class="pinner">
      <div class="phead"><div class="ptitle" id="pt-ten"></div>
        <div class="pright"><span class="pgran" id="pg-ten"></span><span class="pdelta" id="pd-ten"></span></div></div><div id="chart2"></div></div></div>
-   <div class="sec">Driver — on-time renewal (R0), by plan bucket</div>
+   <div class="sec">Driver — expiry-day renewals, by plan bucket</div>
    <div class="card">{p2_drv}</div>
  </div>
 
  <div class="notes"><ul>
    <li>Base = all Home broadband (store_group_id=0), every plan type (PAYG, legacy, migrated). Standard trum filters, IST. Only split is tenure (new &lt;43d / tenured).</li>
    <li>Active = plan live at the checkpoint or last plan ended within 15 days. New vs tenured split at 43 days from install.</li>
-   <li>Day-43 retention counts all installs, so non-converters count against it. Conversion matures ~9 days after install; day-43 lags six weeks and is the confirming outcome.</li>
-   <li>First-renewal R0 and on-time R0 read per plan bucket, never blended. Windows roll on the last 30 days / matured cohorts.</li>
+   <li>Day-43 retention counts all installs, so non-converters count against it (headline = yesterday's cohort, with month-to-date beside it). Day-30 active is of converts only, plan-agnostic sustain. Conversion matures ~9 days after install.</li>
+   <li>Expiry-day renewals read per plan bucket, never blended. Windows roll on the last 30 days / matured cohorts.</li>
    <li>Refreshed daily from Metabase. Not yet cross-checked against an existing Metabase dashboard.</li>
  </ul></div>
  <div class="foot">Both NSMs toggle daily / weekly. Tenured is a 30-day rolling ratio; its earliest daily points sit on a small base.</div>
 </div>
 <script>
 const SER={ser_json};
-const ACC={{new_nsm:'{NAVY}',new_d1:'{TEAL}',ten_nsm:'{NAVY}',oneday:'{GOLD}'}};
+const ACC={{new_nsm:'{NAVY}',new_d1:'{TEAL}',new_d2:'{TEAL}',ten_nsm:'{NAVY}',oneday:'{GOLD}'}};
 const GOODDOWN={{oneday:true}};
-const NAME={{new_nsm:'Day-43 retention',new_d1:'First-paid conversion',ten_nsm:'Active-base retention',oneday:'1-day plan %'}};
-const PANEL={{new_nsm:'new',new_d1:'new',ten_nsm:'ten',oneday:'ten'}};
+const NAME={{new_nsm:'Day-43 retention',new_d1:'First-paid conversion',new_d2:'Day-30 active',ten_nsm:'Active-base retention',oneday:'1-day plan %'}};
+const PANEL={{new_nsm:'new',new_d1:'new',new_d2:'new',ten_nsm:'ten',oneday:'ten'}};
 const MO=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 let cur={{new:null,ten:null}};
-let gran={{new_nsm:'daily',new_d1:'weekly',ten_nsm:'daily',oneday:'weekly'}};
+let gran={{new_nsm:'daily',new_d1:'weekly',new_d2:'daily',ten_nsm:'daily',oneday:'weekly'}};
 function lbl(ds){{return MO[+ds.slice(5,7)-1]+' '+ds.slice(8,10);}}
 function isoMon(ds){{const d=new Date(ds+'T00:00:00');const wd=(d.getDay()+6)%7;d.setDate(d.getDate()-wd);return d.toISOString().slice(0,10);}}
 function getPoints(k){{const s=SER[k];
