@@ -32,8 +32,8 @@ tdrv = D["ten_driver_buckets"]
 gad = D["guard_activedays"]; g1d = D["guard_oneday_headline"]
 
 SER = {
- "new_nsm": {"legacy":85,"band":None,"legacyLabel":"Legacy M1 ~85%","gran":"daily","agg":"sum","toggle":True,"basis":"cohorted by install date","points":series(D["new_nsm_daily"])},
- "new_d1":  {"legacy":None,"band":None,"legacyLabel":None,"gran":"weekly","agg":"sum","toggle":False,"basis":"cohorted by free-trial-expiry date","points":series(D["new_d1_weekly"])},
+ "new_nsm": {"legacy":85,"band":None,"legacyLabel":"Legacy M1 ~85%","gran":"daily","agg":"sum","toggle":True,"basis":"x = install date; measured at day 43","eventoff":43,"eventlbl":"day-43","points":series(D["new_nsm_daily"])},
+ "new_d1":  {"legacy":None,"band":None,"legacyLabel":None,"gran":"weekly","agg":"sum","toggle":False,"basis":"x = free-trial-expiry date; measured within 7d","eventoff":7,"eventlbl":"+7d","points":series(D["new_d1_weekly"])},
  "new_d2":  {"legacy":None,"band":None,"legacyLabel":None,"gran":"weekly","agg":"sum","toggle":False,"basis":"28-day plans, by expiry date","points":series(D["new_d2_weekly"])},
  "in_pay":  {"legacy":None,"band":None,"legacyLabel":None,"gran":"weekly","agg":"sum","toggle":False,"basis":"new customers, by checkout date","points":series(D["in_pay_weekly"])},
  "in_appopen":{"legacy":None,"band":None,"legacyLabel":None,"gran":"weekly","agg":"sum","toggle":False,"basis":"new customers, by plan-expiry date","points":series(D["in_appopen_weekly"])},
@@ -69,12 +69,11 @@ p1 += kpi("new_d1","Driver · convert",TEAL,"First-paid conversion",f"{float(d1[
           f"{num(d1['num'])} of {num(d1['den'])} convert in 7d · {float(d1['same_day']):.0f}% same-day","Leading, ~9-day lag")
 p1 += kpi("new_d2","Driver · renew",TEAL,"Expiry-day renewals",f"{float(d2['pct']):.1f}%",
           f"{num(d2['num'])} of {num(d2['den'])} 28-day plans renewed on time","Renewal rate · 28d shown")
-p1_d2bars = bars(d2b, TEAL)
 
 # Part 1 inputs (new customers only)
 ip=D["in_pay_headline"]; ia=D["in_appopen_headline"]
-p1_in  = kpi("in_pay","Input · payment",INPUT,"Payment success",f"{float(ip['pct']):.1f}%",
-          f"{num(ip['num'])} of {num(ip['den'])} new-customer checkouts complete","Mechanical gate → D1/D2")
+p1_in  = kpi("in_pay","Input · payment",INPUT,"Renewal-payment success",f"{float(ip['pct']):.1f}%",
+          f"{num(ip['num'])} of {num(ip['den'])} attempts succeed in 5 min","Mechanical gate → D1/D2")
 p1_in += kpi("in_appopen","Input · app open",INPUT,"App-open near expiry",f"{float(ia['pct']):.1f}%",
           f"{num(ia['num'])} of {num(ia['den'])} open app ≤3d before expiry","Renewal intent → D2")
 
@@ -149,8 +148,6 @@ html = f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
    <div class="panel" id="panel-new"><div class="pinner">
      <div class="phead"><div class="ptitle" id="pt-new"></div>
        <div class="pright"><span class="pgran" id="pg-new"></span><span class="pdelta" id="pd-new"></span></div></div><div id="chart"></div></div></div>
-   <div class="sec">Expiry-day renewals — by plan bucket (new customers)</div>
-   <div class="card">{p1_d2bars}</div>
    <div class="sec">Inputs — daily levers</div>
    <div class="grid">{p1_in}</div>
  </div>
@@ -184,13 +181,14 @@ const MO=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec
 let cur={{new:null,ten:null}};
 let gran={{new_nsm:'daily',new_d1:'weekly',new_d2:'weekly',in_pay:'weekly',in_appopen:'weekly',ten_nsm:'daily',oneday:'weekly'}};
 function lbl(ds){{return MO[+ds.slice(5,7)-1]+' '+ds.slice(8,10);}}
+function addDays(ds,n){{const d=new Date(ds+'T00:00:00');d.setDate(d.getDate()+n);return d.toISOString().slice(0,10);}}
 function isoMon(ds){{const d=new Date(ds+'T00:00:00');const wd=(d.getDay()+6)%7;d.setDate(d.getDate()-wd);return d.toISOString().slice(0,10);}}
 function getPoints(k){{const s=SER[k];
-  if(s.gran==='weekly'||gran[k]==='daily') return s.points.map(p=>({{x:lbl(p.date),v:p.v,n:p.den}}));
+  if(s.gran==='weekly'||gran[k]==='daily') return s.points.map(p=>({{x:lbl(p.date),v:p.v,n:p.den,date:p.date}}));
   const m={{}};s.points.forEach(p=>{{const w=isoMon(p.date);(m[w]=m[w]||[]).push(p);}});
   return Object.keys(m).sort().map(w=>{{const g=m[w];
-    if(s.agg==='sum'){{let nu=0,de=0;g.forEach(p=>{{nu+=p.num;de+=p.den;}});return {{x:lbl(w),v:Math.round(nu*1000/de)/10,n:de}};}}
-    const lp=g[g.length-1];return {{x:lbl(lp.date),v:lp.v,n:lp.den}};}});
+    if(s.agg==='sum'){{let nu=0,de=0;g.forEach(p=>{{nu+=p.num;de+=p.den;}});return {{x:lbl(w),v:Math.round(nu*1000/de)/10,n:de,date:w}};}}
+    const lp=g[g.length-1];return {{x:lbl(lp.date),v:lp.v,n:lp.den,date:lp.date}};}});
 }}
 function showPart(p){{document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('on',t.dataset.p===p));
   document.querySelectorAll('.part').forEach(x=>x.classList.toggle('on',x.id==='part-'+p));}}
@@ -223,7 +221,8 @@ function chart(s,acc,pts){{
   let d='';pts.forEach((p,i)=>{{d+=(i?'L':'M')+X(i)+' '+Y(p.v)+' ';}});g+=`<path d='${{d}}' fill='none' stroke='${{acc}}' stroke-width='2.2'/>`;
   const step=Math.max(1,Math.ceil(n/9)),rr=n>24?2:3.4;
   pts.forEach((p,i)=>{{const x=X(i),y=Y(p.v),lastp=i===n-1;
-    g+=`<circle cx='${{x}}' cy='${{y}}' r='${{lastp?5:rr}}' fill='${{acc}}'><title>${{p.x}} · ${{p.v}}% · n=${{p.n}}</title></circle>`;
+    const dlab=s.eventoff?('cohort '+p.x+' → '+s.eventlbl+' '+lbl(addDays(p.date,s.eventoff))):p.x;
+    g+=`<circle cx='${{x}}' cy='${{y}}' r='${{lastp?5:rr}}' fill='${{acc}}'><title>${{dlab}} · ${{p.v}}% · n=${{p.n}}</title></circle>`;
     if(lastp||i===0)g+=`<text x='${{x}}' y='${{y-9}}' font-size='10.5' font-weight='700' fill='${{acc}}' text-anchor='${{lastp?'end':'start'}}'>${{p.v}}%</text>`;
     if(lastp||i%step===0)g+=`<text x='${{x}}' y='${{H-12}}' font-size='9' fill='#93a1b5' text-anchor='middle'>${{p.x}}</text>`;}});
   return `<svg viewBox='0 0 ${{W}} ${{H}}' width='100%'>${{g}}</svg>`;

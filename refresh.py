@@ -115,20 +115,21 @@ data["new_d2_buckets"] = rows(*run(q_newrenew("buckets")))
 data["new_d2_weekly"]  = rows(*run(q_newrenew("weekly")))
 
 # ---------- NEW INPUTS: payment success, nudge ----------
-def q_pay(wk):  # NEW customers only: checkout->success for events within 43d of first recharge
-    grp="TO_CHAR(DATE_TRUNC('week',e.ed),'YYYY-MM-DD') wk," if wk else "'hdln' wk,"
+def q_pay(wk):  # NEW customers, renewal-payment 5-min funnel (attempt=checkout deduped per 5-min; success within 5 min)
+    grp="TO_CHAR(DATE_TRUNC('week',CAST(ts0 AS DATE)),'YYYY-MM-DD') wk," if wk else "'hdln' wk,"
     lo=f"DATEADD(day,-90,{T})" if wk else f"DATEADD(day,-30,{T})"
     return f"""
 WITH fr AS (SELECT router_nas_id, MIN(CAST(DATEADD(minute,330,otp_issued_time) AS DATE)) first_dt FROM t_router_user_mapping WHERE {STD} GROUP BY 1),
-e AS (SELECT TO_DATE(TIMESTAMP) ed, TRY_TO_NUMBER(NASID_LONG) nas, EVENT_NAME en
-   FROM public.CT_CUSTOMER_PAYG_PAYMENT_EVENTS_MV WHERE TO_DATE(TIMESTAMP) BETWEEN {lo} AND {T})
-SELECT {grp}
-  SUM(CASE WHEN e.en='checkout_page_loaded' THEN 1 ELSE 0 END) den,
-  SUM(CASE WHEN e.en='payment_success_page_loaded' THEN 1 ELSE 0 END) num,
-  ROUND(SUM(CASE WHEN e.en='payment_success_page_loaded' THEN 1 ELSE 0 END)*100.0
-        /NULLIF(SUM(CASE WHEN e.en='checkout_page_loaded' THEN 1 ELSE 0 END),0),1) pct
-FROM e JOIN fr ON fr.router_nas_id=e.nas WHERE DATEDIFF('day',fr.first_dt,e.ed) BETWEEN 0 AND 43
-GROUP BY 1 ORDER BY 1"""
+ev AS (SELECT TRY_TO_NUMBER(NASID_LONG) nas, TRY_TO_TIMESTAMP(TIMESTAMP) ts, EVENT_NAME en, TO_DATE(TIMESTAMP) ed
+   FROM public.CT_CUSTOMER_PAYG_PAYMENT_EVENTS_MV
+   WHERE FUNNEL_STEP ILIKE '%renew%' AND TO_DATE(TIMESTAMP) BETWEEN {lo} AND {T}),
+evn AS (SELECT e.nas,e.ts,e.en FROM ev e JOIN fr ON fr.router_nas_id=e.nas WHERE DATEDIFF('day',fr.first_dt,e.ed) BETWEEN 0 AND 43),
+att AS (SELECT nas, MIN(ts) ts0 FROM evn WHERE en='checkout_page_loaded' GROUP BY nas, FLOOR(DATE_PART(epoch_second,ts)/300)),
+succ AS (SELECT DISTINCT nas, ts FROM evn WHERE en='payment_success_page_loaded'),
+conv AS (SELECT a.nas, a.ts0,
+   CASE WHEN EXISTS (SELECT 1 FROM succ s WHERE s.nas=a.nas AND s.ts BETWEEN a.ts0 AND DATEADD(minute,5,a.ts0)) THEN 1 ELSE 0 END c
+   FROM att a)
+SELECT {grp} COUNT(*) den, SUM(c) num, ROUND(SUM(c)*100.0/NULLIF(COUNT(*),0),1) pct FROM conv GROUP BY 1 ORDER BY 1"""
 data["in_pay_weekly"]=rows(*run(q_pay(True)))
 data["in_pay_headline"]=rows(*run(q_pay(False)))[0]
 
