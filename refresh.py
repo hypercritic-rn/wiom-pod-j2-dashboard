@@ -39,7 +39,7 @@ data = {}
 
 # ---------- NEW: Day-43 retention (unconditional), DAILY install-cohorts + 30d headline ----------
 def q_d43(mode):
-    hi=f"DATEADD(day,-43,{T})"
+    hi=f"DATEADD(day,-44,{T})"   # day-43 checkpoint must be fully past (<= yesterday); excludes today's immature cohort
     if mode=="daily":
         grp="TO_CHAR(install_dt,'YYYY-MM-DD') wk,"; lo=f"DATEADD(day,-103,{T})"   # ~60 daily cohorts
     elif mode=="mtd":                                                             # day-43 checkpoint this month, through yesterday

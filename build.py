@@ -22,7 +22,7 @@ def series(rows):
              "num":int(float(r.get("num",r["den"]))),"den":int(float(r["den"]))} for r in rows]
 
 # ---- assemble the two parts ----
-nsm_new = D["new_nsm_daily"][-2]   # yesterday's matured day-43 cohort (last point is today, incomplete)
+nsm_new = D["new_nsm_daily"][-1]   # last point = yesterday's cohort (series now excludes today's immature one)
 nsm_mtd = D["new_nsm_mtd"]         # month-to-date through yesterday
 d1 = D["new_d1_headline"]
 d2b = D["new_d2_buckets"]          # expiry-day renewals by plan bucket (new customers)

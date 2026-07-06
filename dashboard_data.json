@@ -359,19 +359,13 @@
    "den": 27,
    "num": 24,
    "pct": 88.9
-  },
-  {
-   "wk": "2026-05-24",
-   "den": 31,
-   "num": 23,
-   "pct": 74.2
   }
  ],
  "new_nsm_headline": {
   "wk": "hdln",
-  "den": 930,
-  "num": 839,
-  "pct": 90.2
+  "den": 899,
+  "num": 816,
+  "pct": 90.8
  },
  "new_nsm_mtd": {
   "wk": "mtd",
