@@ -44,6 +44,8 @@ Dropped: Day-30 active (redundant with NSM); first-renewal-R0 (leaked short plan
 
 Decomposition: `active-base retention ≈ on-time renewal + (missed × grace recovery)`.
 
+**Guardrail (BOTH cohorts): On paid plan.** Snapshot of the recently-relevant base (a paid plan live, or expired ≤30d) split MECE into: on paid plan (live) / lapsed 0–7d / lapsed 7+d. Headline = % on paid plan + the lapse split in the card; single-line trend on % on paid plan (daily/weekly toggle). New base = customers with ≥1 paid recharge. New ~83% (10% / 7%); tenured ~81% (7% / 11%).
+
 ## 5. Plan behaviour  (own tab, both cohorts) ❓
 Descriptive plan mix — no upgrade/downgrade judgment.
 - New: plan chosen at 1st renewal → 2nd renewal, and transitions.
