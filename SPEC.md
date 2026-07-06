@@ -57,7 +57,9 @@ Descriptive plan mix — no upgrade/downgrade judgment.
 - Drivers/inputs: headline + weekly trend (cohorts small → weekly, no daily noise).
 - Trends: daily/weekly toggle only where the base is large (NSMs); weekly-only elsewhere. Every trend labelled with its **cohort basis**.
 - **Lagged cohort metrics show BOTH dates.** For Day-43 retention (and any cohort measured at a lag), the point/tooltip must show the cohort date *and* the event/checkpoint date, e.g. "install 20 May → day-43 02 Jul". The headline (yesterday) is by the *event* date; the graph x-axis is by *cohort* date — surface both so the two aren't confused.
-- Bucket metrics: bars 1d/7d/28d/Other, 28-day headline.
+- **Section order per tab: NSM + drivers → Guardrails → Inputs.**
+- **Weekly trends show only complete (fully-matured) weeks** — a week is plotted only when all 7 of its days are present in the (matured) daily series; partial leading/trailing weeks are dropped.
+- **On-paid-plan guardrail trend plots all three bands** — % on paid (solid, accent) + R0–7 and R7–15 (dashed) on the same 0–100 chart.
 - Colours: NSM navy · driver teal · input purple · guardrail gold.
 - Partial trailing periods drawn hollow.
 
