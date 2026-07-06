@@ -1,7 +1,9 @@
 # Customer POD — J2 Recharge → Exit — Metric & View Spec
 
-Status: **DRAFT — locking in progress.** No building until this is marked LOCKED.
-✔ = agreed · ❓ = open decision (see §6).
+Status: **New-customer part (§3) = LOCKED & built.** Tenured (§4) + plan-behaviour (§5) still open.
+✔ = agreed · ❓ = open decision (see §7).
+
+New-side build notes: payment = renewal 5-min funnel (~74%, not raw ratio); Day-43 & conversion graphs show both cohort + event date; D2 has NO bucket-bars section (28d headline only).
 
 ---
 
