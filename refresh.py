@@ -247,26 +247,8 @@ SELECT COUNT(*) den, ROUND(AVG(ad)/30.0*100,1) avg_pct,
   ROUND(SUM(CASE WHEN ad<9 THEN 1 ELSE 0 END)*100.0/COUNT(*),1) pct
 FROM cov"""))[0]
 
-# ---------- Guardrail: 1-day plan %, weekly + 30d headline ----------
-def q_oneday(wk):
-    grp="TO_CHAR(DATE_TRUNC('week',TO_DATE(DATEADD(minute,330,t.created_on))),'YYYY-MM-DD') wk," if wk else "'hdln' wk,"
-    lo=f"DATEADD(day,-90,{T})" if wk else f"DATEADD(day,-30,{T})"
-    return f"""
-WITH pay AS (SELECT id,ROUND(time_limit/86400.0) days FROM t_plan_configuration WHERE price>0)
-SELECT {grp} COUNT(DISTINCT t.transaction_id) den,
-  COUNT(DISTINCT CASE WHEN p.days=1 THEN t.transaction_id END) num,
-  ROUND(COUNT(DISTINCT CASE WHEN p.days=1 THEN t.transaction_id END)*100.0/NULLIF(COUNT(DISTINCT t.transaction_id),0),1) pct
-FROM t_router_user_mapping t JOIN pay p ON t.selected_plan_id=p.id
-WHERE t.otp='DONE' AND t.store_group_id=0 AND t.device_limit>1 AND t.mobile>'5999999999'
-  AND t.mobile NOT IN ('6900099267','7679376747')
-  AND t.created_by NOT IN (SELECT lco_account_id FROM test_lco_account_id)
-  AND TO_DATE(DATEADD(minute,330,t.created_on)) BETWEEN {lo} AND {T}
-GROUP BY 1 ORDER BY 1"""
-data["guard_oneday_weekly"] = rows(*run(q_oneday(True)))
-data["guard_oneday_headline"] = rows(*run(q_oneday(False)))[0]
-
 # ---------- Guardrail: paid-plan status snapshot per day (both cohorts) ----------
-# Of the recently-relevant base (a paid plan live, or expired <=30d), split: on paid plan / lapsed 0-7d / lapsed 7+d.
+# Base = the NSM active base (paid plan live, or lapsed <=15d). Split: on paid plan / lapsed R0-7 / lapsed R7-15.
 def q_paidstat(ten):
     tclause = "install_dt <= DATEADD(day,-43,d)" if ten else "install_dt > DATEADD(day,-43,d)"
     return f"""
@@ -278,7 +260,7 @@ base AS (SELECT * FROM allrec WHERE ed >= DATEADD(day,-60,{T})),
 spine AS (SELECT DATEADD(day, SEQ4(), DATEADD(day,-30,{T})) d FROM TABLE(GENERATOR(ROWCOUNT=>30))),
 cd AS (SELECT s.d, b.router_nas_id, i.install_dt, MAX(CASE WHEN b.sd<=s.d AND b.price>0 THEN b.ed END) latest_exp
    FROM spine s JOIN base b ON b.sd<=s.d JOIN inst i ON i.router_nas_id=b.router_nas_id GROUP BY s.d, b.router_nas_id, i.install_dt),
-stat AS (SELECT d, install_dt, CASE WHEN latest_exp>=d THEN 'paid' WHEN latest_exp>=DATEADD(day,-7,d) THEN 'l07' WHEN latest_exp>=DATEADD(day,-30,d) THEN 'l7' END st
+stat AS (SELECT d, install_dt, CASE WHEN latest_exp>=d THEN 'paid' WHEN latest_exp>=DATEADD(day,-7,d) THEN 'l07' WHEN latest_exp>=DATEADD(day,-15,d) THEN 'l7' END st
    FROM cd WHERE latest_exp IS NOT NULL)
 SELECT TO_CHAR(d,'YYYY-MM-DD') wk, COUNT(*) den, SUM(CASE WHEN st='paid' THEN 1 ELSE 0 END) num,
    ROUND(SUM(CASE WHEN st='paid' THEN 1 ELSE 0 END)*100.0/COUNT(*),1) pct,
