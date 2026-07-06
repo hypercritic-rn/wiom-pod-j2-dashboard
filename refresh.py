@@ -265,6 +265,29 @@ GROUP BY 1 ORDER BY 1"""
 data["guard_oneday_weekly"] = rows(*run(q_oneday(True)))
 data["guard_oneday_headline"] = rows(*run(q_oneday(False)))[0]
 
+# ---------- Guardrail: paid-plan status snapshot per day (both cohorts) ----------
+# Of the recently-relevant base (a paid plan live, or expired <=30d), split: on paid plan / lapsed 0-7d / lapsed 7+d.
+def q_paidstat(ten):
+    tclause = "install_dt <= DATEADD(day,-43,d)" if ten else "install_dt > DATEADD(day,-43,d)"
+    return f"""
+WITH pay AS (SELECT id,price FROM t_plan_configuration),
+allrec AS (SELECT router_nas_id, CAST(DATEADD(minute,330,otp_issued_time) AS DATE) sd, CAST(DATEADD(minute,330,otp_expiry_time) AS DATE) ed, p.price
+   FROM t_router_user_mapping t JOIN pay p ON t.selected_plan_id=p.id WHERE {STD}),
+inst AS (SELECT router_nas_id, MIN(sd) install_dt FROM allrec GROUP BY 1),
+base AS (SELECT * FROM allrec WHERE ed >= DATEADD(day,-60,{T})),
+spine AS (SELECT DATEADD(day, SEQ4(), DATEADD(day,-30,{T})) d FROM TABLE(GENERATOR(ROWCOUNT=>30))),
+cd AS (SELECT s.d, b.router_nas_id, i.install_dt, MAX(CASE WHEN b.sd<=s.d AND b.price>0 THEN b.ed END) latest_exp
+   FROM spine s JOIN base b ON b.sd<=s.d JOIN inst i ON i.router_nas_id=b.router_nas_id GROUP BY s.d, b.router_nas_id, i.install_dt),
+stat AS (SELECT d, install_dt, CASE WHEN latest_exp>=d THEN 'paid' WHEN latest_exp>=DATEADD(day,-7,d) THEN 'l07' WHEN latest_exp>=DATEADD(day,-30,d) THEN 'l7' END st
+   FROM cd WHERE latest_exp IS NOT NULL)
+SELECT TO_CHAR(d,'YYYY-MM-DD') wk, COUNT(*) den, SUM(CASE WHEN st='paid' THEN 1 ELSE 0 END) num,
+   ROUND(SUM(CASE WHEN st='paid' THEN 1 ELSE 0 END)*100.0/COUNT(*),1) pct,
+   ROUND(SUM(CASE WHEN st='l07' THEN 1 ELSE 0 END)*100.0/COUNT(*),1) l07,
+   ROUND(SUM(CASE WHEN st='l7' THEN 1 ELSE 0 END)*100.0/COUNT(*),1) l7
+FROM stat WHERE st IS NOT NULL AND {tclause} GROUP BY 1 ORDER BY 1"""
+data["new_paidstat_daily"] = rows(*run(q_paidstat(False)))
+data["ten_paidstat_daily"] = rows(*run(q_paidstat(True)))
+
 # stamp (passed in by CI via env; avoids Date.now in restricted contexts)
 data["as_of"] = os.environ.get("AS_OF", "")
 json.dump(data, open(os.path.join(os.path.dirname(__file__),"dashboard_data.json"),"w"), default=str, indent=1)
