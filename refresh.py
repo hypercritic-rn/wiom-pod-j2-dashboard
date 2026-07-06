@@ -37,6 +37,10 @@ def rows(cols, rws):
 
 data = {}
 
+# IST "today" from the SAME clock as every query (Snowflake CURRENT_TIMESTAMP is UTC → +330 = IST).
+# Use this for the displayed "as of" so the label can't drift from the data.
+data["ist_today"] = run("SELECT TO_VARCHAR(TO_DATE(DATEADD(minute,330,CURRENT_TIMESTAMP())),'YYYY-MM-DD') d")[1][0][0]
+
 # ---------- NEW: Day-43 retention (unconditional), DAILY install-cohorts + 30d headline ----------
 def q_d43(mode):
     hi=f"DATEADD(day,-44,{T})"   # day-43 checkpoint must be fully past (<= yesterday); excludes today's immature cohort

@@ -1,7 +1,10 @@
 # -*- coding: utf-8 -*-
 """Read dashboard_data.json, write index.html — a 2-part dashboard
 (Part 1 New customer, Part 2 Tenured base). No hedging copy, terse."""
-import json, os
+import json, os, datetime
+def fmtd(iso, addd=0, fmt='%d %b'):
+    try: return (datetime.date.fromisoformat(iso[:10])+datetime.timedelta(days=addd)).strftime(fmt).lstrip('0')
+    except Exception: return iso
 def _lower(o):
     if isinstance(o,list): return [_lower(x) for x in o]
     if isinstance(o,dict): return {k.lower():_lower(v) for k,v in o.items()}
@@ -64,7 +67,7 @@ def kpi(key, tier, accent, name, val, det, sub, trend=True):
 
 # Part 1 cards
 p1 = kpi("new_nsm","NSM · Day 43 · daily",NAVY,"Day-43 retention",f"{float(nsm_new['pct']):.1f}%",
-         f"{num(nsm_new['num'])} of {num(nsm_new['den'])} yesterday · MTD {float(nsm_mtd['pct']):.1f}%","Owner: activation")
+         f"{num(nsm_new['num'])} of {num(nsm_new['den'])} · day-43 {fmtd(nsm_new['wk'],43)} · MTD {float(nsm_mtd['pct']):.1f}%","Owner: activation")
 p1 += kpi("new_d1","Driver · convert",TEAL,"First-paid conversion",f"{float(d1['pct']):.1f}%",
           f"{num(d1['num'])} of {num(d1['den'])} convert in 7d · {float(d1['same_day']):.0f}% same-day","Leading, ~9-day lag")
 p1 += kpi("new_d2","Driver · renew",TEAL,"Expiry-day renewals",f"{float(d2['pct']):.1f}%",
@@ -79,7 +82,7 @@ p1_in += kpi("in_appopen","Input · app open",INPUT,"App-open near expiry",f"{fl
 
 # Part 2 cards
 p2 = kpi("ten_nsm","NSM · yesterday",NAVY,"Active-base retention",f"{float(ten['pct']):.1f}%",
-         f"{num(ten['num'])} of {num(ten['den'])} tenured active yesterday","Owner: retention")
+         f"{num(ten['num'])} of {num(ten['den'])} tenured active on {fmtd(ten['wk'])}","Owner: retention")
 p2_drv = bars(tdrv, NAVY)
 g_html = f"""<div class="metric notrend" style="--a:{GOLD}">
     <div class="mtier">Guardrail</div><div class="mname">% active days</div><div class="msub">Tenured active base</div>
@@ -90,7 +93,7 @@ g_html = f"""<div class="metric notrend" style="--a:{GOLD}">
     <div class="mval">{float(g1d['pct']):.1f}%</div>
     <div class="mdet">{num(g1d['num'])} of {num(g1d['den'])} recharges</div><div class="mcue"><span class="cue">trend ↗</span></div></div>"""
 
-asof = D.get("as_of","") or "today"
+asof = fmtd(D.get("ist_today") or "", 0, '%d %b %Y') if D.get("ist_today") else (D.get("as_of","") or "today")
 ser_json = json.dumps(SER)
 
 html = f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
