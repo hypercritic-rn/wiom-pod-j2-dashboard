@@ -117,14 +117,14 @@ data["new_d2_daily"]    = rows(*run(q_newrenew("daily")))
 data["new_d2_headline"] = rows(*run(q_newrenew("headline")))[0]
 
 # ---------- NEW INPUTS: payment success, nudge ----------
-def q_pay(wk):  # NEW customers, renewal-payment 5-min funnel (attempt=checkout deduped per 5-min; success within 5 min)
-    grp="TO_CHAR(DATE_TRUNC('week',CAST(ts0 AS DATE)),'YYYY-MM-DD') wk," if wk else "'hdln' wk,"
-    lo=f"DATEADD(day,-90,{T})" if wk else f"DATEADD(day,-30,{T})"
+def q_pay(mode):  # NEW customers, renewal-payment 5-min funnel; daily by checkout day, last 30 days (exclude today = partial)
+    grp="TO_CHAR(CAST(ts0 AS DATE),'YYYY-MM-DD') wk," if mode=="daily" else "'hdln' wk,"
+    lo=f"DATEADD(day,-30,{T})"; hi=f"DATEADD(day,-1,{T})"
     return f"""
 WITH fr AS (SELECT router_nas_id, MIN(CAST(DATEADD(minute,330,otp_issued_time) AS DATE)) first_dt FROM t_router_user_mapping WHERE {STD} GROUP BY 1),
 ev AS (SELECT TRY_TO_NUMBER(NASID_LONG) nas, TRY_TO_TIMESTAMP(TIMESTAMP) ts, EVENT_NAME en, TO_DATE(TIMESTAMP) ed
    FROM public.CT_CUSTOMER_PAYG_PAYMENT_EVENTS_MV
-   WHERE FUNNEL_STEP ILIKE '%renew%' AND TO_DATE(TIMESTAMP) BETWEEN {lo} AND {T}),
+   WHERE FUNNEL_STEP ILIKE '%renew%' AND TO_DATE(TIMESTAMP) BETWEEN {lo} AND {hi}),
 evn AS (SELECT e.nas,e.ts,e.en FROM ev e JOIN fr ON fr.router_nas_id=e.nas WHERE DATEDIFF('day',fr.first_dt,e.ed) BETWEEN 0 AND 43),
 att AS (SELECT nas, MIN(ts) ts0 FROM evn WHERE en='checkout_page_loaded' GROUP BY nas, FLOOR(DATE_PART(epoch_second,ts)/300)),
 succ AS (SELECT DISTINCT nas, ts FROM evn WHERE en='payment_success_page_loaded'),
@@ -132,12 +132,12 @@ conv AS (SELECT a.nas, a.ts0,
    CASE WHEN EXISTS (SELECT 1 FROM succ s WHERE s.nas=a.nas AND s.ts BETWEEN a.ts0 AND DATEADD(minute,5,a.ts0)) THEN 1 ELSE 0 END c
    FROM att a)
 SELECT {grp} COUNT(*) den, SUM(c) num, ROUND(SUM(c)*100.0/NULLIF(COUNT(*),0),1) pct FROM conv GROUP BY 1 ORDER BY 1"""
-data["in_pay_weekly"]=rows(*run(q_pay(True)))
-data["in_pay_headline"]=rows(*run(q_pay(False)))[0]
+data["in_pay_daily"]=rows(*run(q_pay("daily")))
+data["in_pay_headline"]=rows(*run(q_pay("headline")))[0]
 
-def q_appopen(wk):
-    grp="TO_CHAR(DATE_TRUNC('week',exp_dt),'YYYY-MM-DD') wk," if wk else "'hdln' wk,"
-    lo=f"DATEADD(day,-90,{T})" if wk else f"DATEADD(day,-30,{T})"
+def q_appopen(mode):  # daily by expiry day, last 30 days (exclude today = partial)
+    grp="TO_CHAR(exp_dt,'YYYY-MM-DD') wk," if mode=="daily" else "'hdln' wk,"
+    lo=f"DATEADD(day,-30,{T})"; hi=f"DATEADD(day,-1,{T})"
     return f"""
 WITH pay AS (SELECT id,price FROM t_plan_configuration),
 base AS (SELECT router_nas_id, selected_plan_id, created_on,
@@ -148,14 +148,14 @@ seq AS (SELECT b.router_nas_id, b.end_ist, p.price,
    ROW_NUMBER() OVER (PARTITION BY b.router_nas_id, CAST(b.end_ist AS DATE) ORDER BY b.created_on DESC) dpx
    FROM base b JOIN pay p ON b.selected_plan_id=p.id),
 enew AS (SELECT s.router_nas_id, CAST(s.end_ist AS DATE) exp_dt FROM seq s JOIN fr f ON f.router_nas_id=s.router_nas_id
-   WHERE s.dpx=1 AND s.price>0 AND CAST(s.end_ist AS DATE) BETWEEN {lo} AND {T} AND DATEDIFF('day',f.first_dt,CAST(s.end_ist AS DATE))<=43),
+   WHERE s.dpx=1 AND s.price>0 AND CAST(s.end_ist AS DATE) BETWEEN {lo} AND {hi} AND DATEDIFF('day',f.first_dt,CAST(s.end_ist AS DATE))<=43),
 opens AS (SELECT DISTINCT TRY_TO_NUMBER(NASIDLONG) nas, TO_DATE(TIMESTAMP) d FROM public.CT_CUSTOMER_APP_LAUNCH
-   WHERE TO_DATE(TIMESTAMP) BETWEEN DATEADD(day,-94,{T}) AND {T}),
+   WHERE TO_DATE(TIMESTAMP) BETWEEN DATEADD(day,-34,{T}) AND {hi}),
 ew AS (SELECT e.router_nas_id, e.exp_dt, MAX(CASE WHEN o.nas IS NOT NULL THEN 1 ELSE 0 END) opened
    FROM enew e LEFT JOIN opens o ON o.nas=e.router_nas_id AND o.d BETWEEN DATEADD(day,-3,e.exp_dt) AND e.exp_dt GROUP BY 1,2)
 SELECT {grp} COUNT(*) den, SUM(opened) num, ROUND(SUM(opened)*100.0/COUNT(*),1) pct FROM ew GROUP BY 1 ORDER BY 1"""
-data["in_appopen_weekly"]=rows(*run(q_appopen(True)))
-data["in_appopen_headline"]=rows(*run(q_appopen(False)))[0]
+data["in_appopen_daily"]=rows(*run(q_appopen("daily")))
+data["in_appopen_headline"]=rows(*run(q_appopen("headline")))[0]
 
 # ---------- TENURED NSM: active-base retention, rolling 30d, DAILY series ----------
 # For each report day D: active(D) / active(D-30), tenured (first_dt <= D-30-43).

@@ -40,8 +40,8 @@ SER = {
  "new_nsm": {"legacy":85,"band":None,"legacyLabel":"Legacy M1 ~85%","gran":"daily","agg":"sum","toggle":True,"basis":"x = day-43 date · last 30 days · cohort installed 43d earlier","points":series(D["new_nsm_daily"])},
  "new_d1":  {"legacy":None,"band":None,"legacyLabel":None,"gran":"daily","agg":"sum","toggle":True,"basis":"x = free-trial-expiry date · matured 7d","eventoff":7,"eventlbl":"+7d","points":series(D["new_d1_daily"])},
  "new_d2":  {"legacy":None,"band":None,"legacyLabel":None,"gran":"daily","agg":"sum","toggle":True,"basis":"all plans · by expiry date · last 30 days","points":series(D["new_d2_daily"])},
- "in_pay":  {"legacy":None,"band":None,"legacyLabel":None,"gran":"weekly","agg":"sum","toggle":False,"basis":"new customers, by checkout date","points":series(D["in_pay_weekly"])},
- "in_appopen":{"legacy":None,"band":None,"legacyLabel":None,"gran":"weekly","agg":"sum","toggle":False,"basis":"new customers, by plan-expiry date","points":series(D["in_appopen_weekly"])},
+ "in_pay":  {"legacy":None,"band":None,"legacyLabel":None,"gran":"daily","agg":"sum","toggle":True,"basis":"new customers · by checkout date · last 30 days","points":series(D["in_pay_daily"])},
+ "in_appopen":{"legacy":None,"band":None,"legacyLabel":None,"gran":"daily","agg":"sum","toggle":True,"basis":"new customers · by expiry date · last 30 days","points":series(D["in_appopen_daily"])},
  "ten_nsm": {"legacy":90,"band":[85,95],"legacyLabel":"Legacy 85–95%","gran":"daily","agg":"sample","toggle":True,"basis":"by report date (rolling 30d)","points":series(D["ten_nsm_daily"])},
  "oneday":  {"legacy":None,"band":None,"legacyLabel":None,"gran":"weekly","agg":"sum","toggle":False,"basis":"by recharge date","points":series(D["guard_oneday_weekly"])},
 }
@@ -167,13 +167,27 @@ html = f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
    <div class="card">{p2_drv}</div>
  </div>
 
- <div class="notes"><ul>
+ <div class="notes">
+   <div style="font-weight:700;color:#14284a;margin:2px 0 7px;font-size:13px">Metric definitions</div>
+   <ul>
+   <li><b>Day-43 retention</b> (new · NSM) — of an install-day cohort, the share still active on day 43. Denominator = all installs. Plotted by day-43 date.</li>
+   <li><b>First-paid conversion</b> (new · driver) — of new installs, the share making their first paid recharge within 7 days of free-trial expiry.</li>
+   <li><b>Expiry-day renewals</b> (new · driver) — of new-customer paid-plan expiries (all plans blended), the share whose next plan starts on or before expiry.</li>
+   <li><b>Renewal-payment success</b> (new · input) — of new-customer renewal-payment checkouts, the share reaching payment success within 5 minutes (attempts deduped per 5-min).</li>
+   <li><b>App-open near expiry</b> (new · input) — of new-customer expiries, the share where the customer opened the app in the 3 days before expiry.</li>
+   <li><b>Active-base retention</b> (tenured · NSM) — active tenured customers today ÷ active tenured 30 days ago (rolling 30-day ratio).</li>
+   <li><b>Expiry-day renewals</b> (tenured · driver) — as above for tenured expiries, read per plan bucket.</li>
+   <li><b>% active days</b> (tenured · guardrail) — average share of days the connection was active over the rolling 30 days.</li>
+   <li><b>1-day plan %</b> (tenured · guardrail) — 1-day recharges ÷ all paid recharges (lower is better for LTV).</li>
+   </ul>
+   <div style="font-weight:700;color:#14284a;margin:12px 0 7px;font-size:13px">Method</div>
+   <ul>
    <li>Base = all Home broadband (store_group_id=0), every plan type (PAYG, legacy, migrated). Standard trum filters, IST. Only split is tenure (new &lt;43d / tenured).</li>
-   <li>Active = plan live at the checkpoint or last plan ended within 15 days. New vs tenured split at 43 days from install.</li>
-   <li>Day-43 retention counts all installs, so non-converters count against it (headline = yesterday's cohort, with month-to-date beside it). Conversion matures ~9 days after install. Expiry-day renewals = on-time renewal rate of new customers' paid plans (headline = 28-day bucket).</li>
-   <li>Expiry-day renewals read per plan bucket, never blended. Windows roll on the last 30 days / matured cohorts.</li>
+   <li>Active = plan live at the checkpoint or last plan ended within 15 days.</li>
+   <li>Lagged metrics exclude the current, still-maturing day/cohort. Windows roll on the last 30 days. Charts use a fixed 0–100% axis.</li>
    <li>Refreshed daily from Metabase. Not yet cross-checked against an existing Metabase dashboard.</li>
- </ul></div>
+   </ul>
+ </div>
  <div class="foot">Both NSMs toggle daily / weekly. Tenured is a 30-day rolling ratio; its earliest daily points sit on a small base.</div>
 </div>
 <script>
@@ -184,7 +198,7 @@ const NAME={{new_nsm:'Day-43 retention',new_d1:'First-paid conversion',new_d2:'E
 const PANEL={{new_nsm:'new',new_d1:'new',new_d2:'new',in_pay:'new',in_appopen:'new',ten_nsm:'ten',oneday:'ten'}};
 const MO=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 let cur={{new:null,ten:null}};
-let gran={{new_nsm:'daily',new_d1:'daily',new_d2:'daily',in_pay:'weekly',in_appopen:'weekly',ten_nsm:'daily',oneday:'weekly'}};
+let gran={{new_nsm:'daily',new_d1:'daily',new_d2:'daily',in_pay:'daily',in_appopen:'daily',ten_nsm:'daily',oneday:'weekly'}};
 function lbl(ds){{return MO[+ds.slice(5,7)-1]+' '+ds.slice(8,10);}}
 function addDays(ds,n){{const d=new Date(ds+'T00:00:00');d.setDate(d.getDate()+n);return d.toISOString().slice(0,10);}}
 function isoMon(ds){{const d=new Date(ds+'T00:00:00');const wd=(d.getDay()+6)%7;d.setDate(d.getDate()-wd);return d.toISOString().slice(0,10);}}
@@ -217,8 +231,7 @@ function render(k){{const p=PANEL[k],s=SER[k],pts=getPoints(k),last=pts[pts.leng
 }}
 function chart(s,acc,pts){{
   const W=1040,H=230,pl=42,pr=130,pt=20,pb=36,iw=W-pl-pr,ih=H-pt-pb;
-  const vals=pts.map(p=>p.v).concat(s.legacy?[s.legacy]:[]).concat(s.band||[]);
-  let mn=Math.min(...vals),mx=Math.max(...vals);const pad=Math.max(1,(mx-mn)*0.25);mn=Math.floor(mn-pad);mx=Math.ceil(mx+pad);
+  let mn=0,mx=100;   // fixed 0–100 y-axis across all charts
   const n=pts.length,X=i=>pl+(n===1?iw/2:iw*i/(n-1)),Y=v=>pt+ih*(1-(v-mn)/(mx-mn));let g='';
   for(let k=0;k<=4;k++){{const val=mn+(mx-mn)*k/4,y=Y(val);g+=`<line x1='${{pl}}' y1='${{y}}' x2='${{pl+iw}}' y2='${{y}}' stroke='#eef1f6'/><text x='${{pl-8}}' y='${{y+3}}' font-size='10' fill='#93a1b5' text-anchor='end'>${{val.toFixed(0)}}%</text>`;}}
   if(s.band){{const y1=Y(s.band[1]),y2=Y(s.band[0]);g+=`<rect x='${{pl}}' y='${{y1}}' width='${{iw}}' height='${{y2-y1}}' fill='#1f7a70' opacity='.06'/>`;}}
