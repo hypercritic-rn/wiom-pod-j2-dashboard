@@ -40,11 +40,10 @@ Dropped: Day-30 active (redundant with NSM); first-renewal-R0 (leaked short plan
 | **Input** | Renewal-payment success | 5-min funnel, tenured-scoped. | 30d headline + daily toggle. |
 | **Input** | App-open near expiry | tenured expiries with app open ≤3d before expiry. | 30d headline + daily toggle. |
 | **Guardrail** | % active days | avg coverage + share under 30% (rolling 30d). | headline. |
-| **Guardrail** | 1-day plan % | 1-day recharges ÷ total paid recharges. ↓ better. | headline + weekly trend. |
 
-Decomposition: `active-base retention ≈ on-time renewal + (missed × grace recovery)`.
+Decomposition: `active-base retention ≈ on-time renewal + (missed × grace recovery)`. (1-day plan % guardrail REMOVED from tenured.)
 
-**Guardrail (BOTH cohorts): On paid plan.** Snapshot of the recently-relevant base (a paid plan live, or expired ≤30d) split MECE into: on paid plan (live) / lapsed 0–7d / lapsed 7+d. Headline = % on paid plan + the lapse split in the card; single-line trend on % on paid plan (daily/weekly toggle). New base = customers with ≥1 paid recharge. New ~83% (10% / 7%); tenured ~81% (7% / 11%).
+**Guardrail (BOTH cohorts): On paid plan.** Base = the cohort's **active (NSM) base** (a paid plan live, or lapsed ≤15d) — so it decomposes the retained customers. Split MECE: on paid plan (live) / lapsed R0–7d / lapsed R7–15d; sums to 100%. Headline = % on paid plan + the lapse split; single-line trend on % on paid plan (daily/weekly toggle). New base = customers with ≥1 paid recharge. New ~85% (10/5); tenured ~88% (8/4).
 
 ## 5. Plan behaviour  (own tab, both cohorts) ❓
 Descriptive plan mix — no upgrade/downgrade judgment.
