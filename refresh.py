@@ -70,9 +70,9 @@ data["new_nsm_headline"] = rows(*run(q_d43("headline")))[0]
 data["new_nsm_mtd"] = rows(*run(q_d43("mtd")))[0]
 
 # ---------- NEW Driver 1: first-paid conversion R7, weekly + 30d headline ----------
-def q_conv(wk):
-    grp = "TO_CHAR(DATE_TRUNC('week',free_end),'YYYY-MM-DD') wk," if wk else "'hdln' wk,"
-    lo = f"DATEADD(day,-90,{T})" if wk else f"DATEADD(day,-37,{T})"
+def q_conv(mode):   # daily = by free-trial-expiry day (last 90d, matured); headline = 30d aggregate
+    grp = "TO_CHAR(CAST(free_end AS DATE),'YYYY-MM-DD') wk," if mode=="daily" else "'hdln' wk,"
+    lo = f"DATEADD(day,-97,{T})" if mode=="daily" else f"DATEADD(day,-37,{T})"
     return f"""
 WITH pay AS (SELECT id,price FROM t_plan_configuration),
 base AS (SELECT router_nas_id, transaction_id, selected_plan_id,
@@ -89,15 +89,13 @@ SELECT {grp} COUNT(*) den,
   ROUND(SUM(CASE WHEN R IS NOT NULL AND R BETWEEN 0 AND 7 THEN 1 ELSE 0 END)*100.0/NULLIF(COUNT(*),0),1) pct,
   ROUND(SUM(CASE WHEN R IS NOT NULL AND R<=0 THEN 1 ELSE 0 END)*100.0/NULLIF(COUNT(*),0),1) same_day
 FROM free GROUP BY 1 ORDER BY 1"""
-data["new_d1_weekly"] = rows(*run(q_conv(True)))
-data["new_d1_headline"] = rows(*run(q_conv(False)))[0]
+data["new_d1_daily"] = rows(*run(q_conv("daily")))
+data["new_d1_headline"] = rows(*run(q_conv("headline")))[0]
 
 # ---------- NEW Driver 2: Expiry-day renewals (renewal rate) — new-customer paid expiries ----------
-def q_newrenew(mode):
-    if mode=="weekly":
-        sel="TO_CHAR(DATE_TRUNC('week',CAST(end_ist AS DATE)),'YYYY-MM-DD') wk,"; lo=f"DATEADD(day,-90,{T})"; extra="AND plan_days=28"
-    else:
-        sel="CASE WHEN plan_days=1 THEN '1d' WHEN plan_days=7 THEN '7d' WHEN plan_days=28 THEN '28d' ELSE 'Other' END wk,"; lo=f"DATEADD(day,-30,{T})"; extra=""
+def q_newrenew(mode):   # ALL plans blended, by expiry day, last 30 days (exclude today = incomplete R0)
+    lo=f"DATEADD(day,-30,{T})"; hi=f"DATEADD(day,-1,{T})"; extra=""
+    sel="TO_CHAR(CAST(end_ist AS DATE),'YYYY-MM-DD') wk," if mode=="daily" else "'hdln' wk,"
     return f"""
 WITH pay AS (SELECT id,price,ROUND(time_limit/86400.0) days FROM t_plan_configuration),
 base AS (SELECT router_nas_id, selected_plan_id, created_on,
@@ -111,12 +109,12 @@ seq AS (SELECT b.router_nas_id, b.end_ist, p.days plan_days, p.price,
 exp AS (SELECT s.end_ist, s.plan_days, DATEDIFF('day',s.end_ist,s.nxt) R,
    DATEDIFF('day', f.first_dt, CAST(s.end_ist AS DATE)) tenure
    FROM seq s JOIN fr f ON f.router_nas_id=s.router_nas_id
-   WHERE s.dpx=1 AND s.price>0 AND CAST(s.end_ist AS DATE) BETWEEN {lo} AND {T})
+   WHERE s.dpx=1 AND s.price>0 AND CAST(s.end_ist AS DATE) BETWEEN {lo} AND {hi})
 SELECT {sel} COUNT(*) den, SUM(CASE WHEN R IS NOT NULL AND R<=0 THEN 1 ELSE 0 END) num,
   ROUND(SUM(CASE WHEN R IS NOT NULL AND R<=0 THEN 1 ELSE 0 END)*100.0/COUNT(*),1) pct
 FROM exp WHERE tenure<=43 {extra} GROUP BY 1 ORDER BY 1"""
-data["new_d2_buckets"] = rows(*run(q_newrenew("buckets")))
-data["new_d2_weekly"]  = rows(*run(q_newrenew("weekly")))
+data["new_d2_daily"]    = rows(*run(q_newrenew("daily")))
+data["new_d2_headline"] = rows(*run(q_newrenew("headline")))[0]
 
 # ---------- NEW INPUTS: payment success, nudge ----------
 def q_pay(wk):  # NEW customers, renewal-payment 5-min funnel (attempt=checkout deduped per 5-min; success within 5 min)

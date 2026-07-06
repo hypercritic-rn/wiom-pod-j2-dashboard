@@ -28,17 +28,18 @@ def series(rows):
 # ---- assemble the two parts ----
 nsm_new = D["new_nsm_daily"][-1]   # last point = yesterday's cohort (series now excludes today's immature one)
 nsm_mtd = D["new_nsm_mtd"]         # month-to-date through yesterday
-d1 = D["new_d1_headline"]
-d2b = D["new_d2_buckets"]          # expiry-day renewals by plan bucket (new customers)
-d2 = next((r for r in d2b if r["wk"]=="28d"), d2b[0])   # 28-day bucket headline
+d1 = D["new_d1_headline"]          # 30d aggregate (secondary, stable)
+d1d = D["new_d1_daily"][-1]        # last complete day (daily headline)
+d2d = D["new_d2_daily"][-1]        # last complete expiry day, ALL plans (daily headline)
+d2_30 = D["new_d2_headline"]       # 30d all-plan aggregate (secondary, stable)
 ten = D["ten_nsm_daily"][-2]       # yesterday's rolling-30 active-base value
 tdrv = D["ten_driver_buckets"]
 gad = D["guard_activedays"]; g1d = D["guard_oneday_headline"]
 
 SER = {
  "new_nsm": {"legacy":85,"band":None,"legacyLabel":"Legacy M1 ~85%","gran":"daily","agg":"sum","toggle":True,"basis":"x = day-43 date · last 30 days · cohort installed 43d earlier","points":series(D["new_nsm_daily"])},
- "new_d1":  {"legacy":None,"band":None,"legacyLabel":None,"gran":"weekly","agg":"sum","toggle":False,"basis":"x = free-trial-expiry date; measured within 7d","eventoff":7,"eventlbl":"+7d","points":series(D["new_d1_weekly"])},
- "new_d2":  {"legacy":None,"band":None,"legacyLabel":None,"gran":"weekly","agg":"sum","toggle":False,"basis":"28-day plans, by expiry date","points":series(D["new_d2_weekly"])},
+ "new_d1":  {"legacy":None,"band":None,"legacyLabel":None,"gran":"daily","agg":"sum","toggle":True,"basis":"x = free-trial-expiry date · matured 7d","eventoff":7,"eventlbl":"+7d","points":series(D["new_d1_daily"])},
+ "new_d2":  {"legacy":None,"band":None,"legacyLabel":None,"gran":"daily","agg":"sum","toggle":True,"basis":"all plans · by expiry date · last 30 days","points":series(D["new_d2_daily"])},
  "in_pay":  {"legacy":None,"band":None,"legacyLabel":None,"gran":"weekly","agg":"sum","toggle":False,"basis":"new customers, by checkout date","points":series(D["in_pay_weekly"])},
  "in_appopen":{"legacy":None,"band":None,"legacyLabel":None,"gran":"weekly","agg":"sum","toggle":False,"basis":"new customers, by plan-expiry date","points":series(D["in_appopen_weekly"])},
  "ten_nsm": {"legacy":90,"band":[85,95],"legacyLabel":"Legacy 85–95%","gran":"daily","agg":"sample","toggle":True,"basis":"by report date (rolling 30d)","points":series(D["ten_nsm_daily"])},
@@ -69,10 +70,10 @@ def kpi(key, tier, accent, name, val, det, sub, trend=True):
 # Part 1 cards
 p1 = kpi("new_nsm","NSM · Day 43 · daily",NAVY,"Day-43 retention",f"{float(nsm_new['pct']):.1f}%",
          f"{num(nsm_new['num'])} of {num(nsm_new['den'])} · day-43 {fmtd(nsm_new['wk'])} · MTD {float(nsm_mtd['pct']):.1f}%","Owner: activation")
-p1 += kpi("new_d1","Driver · convert",TEAL,"First-paid conversion",f"{float(d1['pct']):.1f}%",
-          f"{num(d1['num'])} of {num(d1['den'])} convert in 7d · {float(d1['same_day']):.0f}% same-day","Leading, ~9-day lag")
-p1 += kpi("new_d2","Driver · renew",TEAL,"Expiry-day renewals",f"{float(d2['pct']):.1f}%",
-          f"{num(d2['num'])} of {num(d2['den'])} 28-day plans renewed on time","Renewal rate · 28d shown")
+p1 += kpi("new_d1","Driver · convert · daily",TEAL,"First-paid conversion",f"{float(d1d['pct']):.1f}%",
+          f"{num(d1d['num'])} of {num(d1d['den'])} in 7d · {fmtd(d1d['wk'])} · 30d {float(d1['pct']):.1f}%","Leading, ~9-day lag")
+p1 += kpi("new_d2","Driver · renew · daily",TEAL,"Expiry-day renewals",f"{float(d2d['pct']):.1f}%",
+          f"{num(d2d['num'])} of {num(d2d['den'])} renewed on time · {fmtd(d2d['wk'])} · 30d {float(d2_30['pct']):.1f}%","Renewal rate · all plans")
 
 # Part 1 inputs (new customers only)
 ip=D["in_pay_headline"]; ia=D["in_appopen_headline"]
@@ -179,11 +180,11 @@ html = f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
 const SER={ser_json};
 const ACC={{new_nsm:'{NAVY}',new_d1:'{TEAL}',new_d2:'{TEAL}',in_pay:'{INPUT}',in_appopen:'{INPUT}',ten_nsm:'{NAVY}',oneday:'{GOLD}'}};
 const GOODDOWN={{oneday:true}};
-const NAME={{new_nsm:'Day-43 retention',new_d1:'First-paid conversion',new_d2:'Expiry-day renewals (28d)',in_pay:'Payment success',in_appopen:'App-open near expiry',ten_nsm:'Active-base retention',oneday:'1-day plan %'}};
+const NAME={{new_nsm:'Day-43 retention',new_d1:'First-paid conversion',new_d2:'Expiry-day renewals',in_pay:'Payment success',in_appopen:'App-open near expiry',ten_nsm:'Active-base retention',oneday:'1-day plan %'}};
 const PANEL={{new_nsm:'new',new_d1:'new',new_d2:'new',in_pay:'new',in_appopen:'new',ten_nsm:'ten',oneday:'ten'}};
 const MO=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 let cur={{new:null,ten:null}};
-let gran={{new_nsm:'daily',new_d1:'weekly',new_d2:'weekly',in_pay:'weekly',in_appopen:'weekly',ten_nsm:'daily',oneday:'weekly'}};
+let gran={{new_nsm:'daily',new_d1:'daily',new_d2:'daily',in_pay:'weekly',in_appopen:'weekly',ten_nsm:'daily',oneday:'weekly'}};
 function lbl(ds){{return MO[+ds.slice(5,7)-1]+' '+ds.slice(8,10);}}
 function addDays(ds,n){{const d=new Date(ds+'T00:00:00');d.setDate(d.getDate()+n);return d.toISOString().slice(0,10);}}
 function isoMon(ds){{const d=new Date(ds+'T00:00:00');const wd=(d.getDay()+6)%7;d.setDate(d.getDate()-wd);return d.toISOString().slice(0,10);}}
