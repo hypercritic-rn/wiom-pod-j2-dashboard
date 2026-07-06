@@ -22,8 +22,8 @@ Renewal health, so an owner can see if action is needed. Two cohorts split only 
 | Tier | Metric | Definition | Display | Cohort basis |
 |---|---|---|---|---|
 | **NSM** | Day-43 retention | % of install cohort active at day 43. Denominator = ALL installs. | Headline = **yesterday** + **MTD-through-yesterday**. Trend daily/weekly toggle. | install date |
-| **Driver 1** | First-paid conversion | % of installs making first paid recharge within 7d of free-trial expiry. | Headline + weekly trend. | free-trial-expiry date |
-| **Driver 2** | Expiry-day renewals | on-time renewal rate (next plan starts ≤ expiry) of new-customer paid plans, by bucket. | Headline = **28-day bucket**; bucket bars below. Weekly trend (28d). | expiry date |
+| **Driver 1** | First-paid conversion | % of installs making first paid recharge within 7d of free-trial expiry. | **Daily headline** (last matured day) + 30d secondary. Daily/weekly toggle trend. | free-trial-expiry date |
+| **Driver 2** | Expiry-day renewals | on-time renewal rate (next plan starts ≤ expiry) of new-customer paid plans, **ALL plans blended** (not per-bucket — 28d-only was ~6/day, too thin). | **Daily headline** (~105/day, last complete day) + 30d secondary. Daily/weekly toggle trend, **last 30 days**. | expiry date |
 | **Input** | Renewal-payment success ✔ | 5-min funnel: attempt = `checkout_page_loaded`, converts if `payment_success_page_loaded` within 5 min. New-customer renewal payments. **`FUNNEL_STEP` in (`renewal`,`renewal_payment_flow`) — checkout & success carry different labels, need both.** Attempts deduped per NAS per 5-min clock window. ~74%. | Headline + weekly trend. | checkout date |
 | **Input** | App-open near expiry | % of new-customer expiries with an app open ≤3d before expiry. | Headline + weekly trend. | expiry date |
 
