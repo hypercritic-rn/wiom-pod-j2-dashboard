@@ -44,12 +44,12 @@ data["ist_today"] = run("SELECT TO_VARCHAR(TO_DATE(DATEADD(minute,330,CURRENT_TI
 # ---------- NEW: Day-43 retention (unconditional), DAILY install-cohorts + 30d headline ----------
 def q_d43(mode):
     hi=f"DATEADD(day,-44,{T})"   # day-43 checkpoint must be fully past (<= yesterday); excludes today's immature cohort
-    if mode=="daily":
-        grp="TO_CHAR(install_dt,'YYYY-MM-DD') wk,"; lo=f"DATEADD(day,-103,{T})"   # ~60 daily cohorts
+    if mode=="daily":            # plotted by DAY-43 (event) date, last 30 days
+        sel="TO_CHAR(day43,'YYYY-MM-DD') wk, TO_CHAR(install_dt,'YYYY-MM-DD') cohort,"; grpby="1,2"; lo=f"DATEADD(day,-73,{T})"
     elif mode=="mtd":                                                             # day-43 checkpoint this month, through yesterday
-        grp="'mtd' wk,"; lo=f"DATEADD(day,-43,DATE_TRUNC('month',{T}))"; hi=f"DATEADD(day,-44,{T})"
+        sel="'mtd' wk, NULL cohort,"; grpby="1"; lo=f"DATEADD(day,-43,DATE_TRUNC('month',{T}))"
     else:
-        grp="'hdln' wk,"; lo=f"DATEADD(day,-73,{T})"                              # 30d aggregate
+        sel="'hdln' wk, NULL cohort,"; grpby="1"; lo=f"DATEADD(day,-73,{T})"      # 30d aggregate
     return f"""
 WITH base AS (SELECT router_nas_id, transaction_id,
    DATEADD(minute,330,otp_issued_time) start_ist, DATEADD(minute,330,otp_expiry_time) end_ist,
@@ -61,10 +61,10 @@ installs AS (SELECT router_nas_id, CAST(start_ist AS DATE) install_dt, DATEADD(d
 ls AS (SELECT i.router_nas_id, i.install_dt, i.day43,
    MAX(CASE WHEN CAST(b.start_ist AS DATE)<=i.day43 THEN b.end_ist END) last_end
    FROM installs i JOIN base b ON b.router_nas_id=i.router_nas_id GROUP BY 1,2,3)
-SELECT {grp} COUNT(*) den,
+SELECT {sel} COUNT(*) den,
   SUM(CASE WHEN last_end>=DATEADD(day,-15,day43) THEN 1 ELSE 0 END) num,
   ROUND(SUM(CASE WHEN last_end>=DATEADD(day,-15,day43) THEN 1 ELSE 0 END)*100.0/COUNT(*),1) pct
-FROM ls GROUP BY 1 ORDER BY 1"""
+FROM ls GROUP BY {grpby} ORDER BY 1"""
 data["new_nsm_daily"] = rows(*run(q_d43("daily")))
 data["new_nsm_headline"] = rows(*run(q_d43("headline")))[0]
 data["new_nsm_mtd"] = rows(*run(q_d43("mtd")))[0]

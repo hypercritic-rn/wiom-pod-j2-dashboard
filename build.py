@@ -22,7 +22,8 @@ def wk(s):
 
 def series(rows):
     return [{"date":r["wk"],"v":float(r["pct"]),
-             "num":int(float(r.get("num",r["den"]))),"den":int(float(r["den"]))} for r in rows]
+             "num":int(float(r.get("num",r["den"]))),"den":int(float(r["den"])),
+             **({"cohort":r["cohort"]} if r.get("cohort") else {})} for r in rows]
 
 # ---- assemble the two parts ----
 nsm_new = D["new_nsm_daily"][-1]   # last point = yesterday's cohort (series now excludes today's immature one)
@@ -35,7 +36,7 @@ tdrv = D["ten_driver_buckets"]
 gad = D["guard_activedays"]; g1d = D["guard_oneday_headline"]
 
 SER = {
- "new_nsm": {"legacy":85,"band":None,"legacyLabel":"Legacy M1 ~85%","gran":"daily","agg":"sum","toggle":True,"basis":"x = install date; measured at day 43","eventoff":43,"eventlbl":"day-43","points":series(D["new_nsm_daily"])},
+ "new_nsm": {"legacy":85,"band":None,"legacyLabel":"Legacy M1 ~85%","gran":"daily","agg":"sum","toggle":True,"basis":"x = day-43 date · last 30 days · cohort installed 43d earlier","points":series(D["new_nsm_daily"])},
  "new_d1":  {"legacy":None,"band":None,"legacyLabel":None,"gran":"weekly","agg":"sum","toggle":False,"basis":"x = free-trial-expiry date; measured within 7d","eventoff":7,"eventlbl":"+7d","points":series(D["new_d1_weekly"])},
  "new_d2":  {"legacy":None,"band":None,"legacyLabel":None,"gran":"weekly","agg":"sum","toggle":False,"basis":"28-day plans, by expiry date","points":series(D["new_d2_weekly"])},
  "in_pay":  {"legacy":None,"band":None,"legacyLabel":None,"gran":"weekly","agg":"sum","toggle":False,"basis":"new customers, by checkout date","points":series(D["in_pay_weekly"])},
@@ -67,7 +68,7 @@ def kpi(key, tier, accent, name, val, det, sub, trend=True):
 
 # Part 1 cards
 p1 = kpi("new_nsm","NSM · Day 43 · daily",NAVY,"Day-43 retention",f"{float(nsm_new['pct']):.1f}%",
-         f"{num(nsm_new['num'])} of {num(nsm_new['den'])} · day-43 {fmtd(nsm_new['wk'],43)} · MTD {float(nsm_mtd['pct']):.1f}%","Owner: activation")
+         f"{num(nsm_new['num'])} of {num(nsm_new['den'])} · day-43 {fmtd(nsm_new['wk'])} · MTD {float(nsm_mtd['pct']):.1f}%","Owner: activation")
 p1 += kpi("new_d1","Driver · convert",TEAL,"First-paid conversion",f"{float(d1['pct']):.1f}%",
           f"{num(d1['num'])} of {num(d1['den'])} convert in 7d · {float(d1['same_day']):.0f}% same-day","Leading, ~9-day lag")
 p1 += kpi("new_d2","Driver · renew",TEAL,"Expiry-day renewals",f"{float(d2['pct']):.1f}%",
@@ -187,7 +188,7 @@ function lbl(ds){{return MO[+ds.slice(5,7)-1]+' '+ds.slice(8,10);}}
 function addDays(ds,n){{const d=new Date(ds+'T00:00:00');d.setDate(d.getDate()+n);return d.toISOString().slice(0,10);}}
 function isoMon(ds){{const d=new Date(ds+'T00:00:00');const wd=(d.getDay()+6)%7;d.setDate(d.getDate()-wd);return d.toISOString().slice(0,10);}}
 function getPoints(k){{const s=SER[k];
-  if(s.gran==='weekly'||gran[k]==='daily') return s.points.map(p=>({{x:lbl(p.date),v:p.v,n:p.den,date:p.date}}));
+  if(s.gran==='weekly'||gran[k]==='daily') return s.points.map(p=>({{x:lbl(p.date),v:p.v,n:p.den,date:p.date,cohort:p.cohort}}));
   const m={{}};s.points.forEach(p=>{{const w=isoMon(p.date);(m[w]=m[w]||[]).push(p);}});
   return Object.keys(m).sort().map(w=>{{const g=m[w];
     if(s.agg==='sum'){{let nu=0,de=0;g.forEach(p=>{{nu+=p.num;de+=p.den;}});return {{x:lbl(w),v:Math.round(nu*1000/de)/10,n:de,date:w}};}}
@@ -224,7 +225,7 @@ function chart(s,acc,pts){{
   let d='';pts.forEach((p,i)=>{{d+=(i?'L':'M')+X(i)+' '+Y(p.v)+' ';}});g+=`<path d='${{d}}' fill='none' stroke='${{acc}}' stroke-width='2.2'/>`;
   const step=Math.max(1,Math.ceil(n/9)),rr=n>24?2:3.4;
   pts.forEach((p,i)=>{{const x=X(i),y=Y(p.v),lastp=i===n-1;
-    const dlab=s.eventoff?('cohort '+p.x+' → '+s.eventlbl+' '+lbl(addDays(p.date,s.eventoff))):p.x;
+    const dlab=p.cohort?('install '+lbl(p.cohort)+' → day-43 '+p.x):(s.eventoff?('cohort '+p.x+' → '+s.eventlbl+' '+lbl(addDays(p.date,s.eventoff))):p.x);
     g+=`<circle cx='${{x}}' cy='${{y}}' r='${{lastp?5:rr}}' fill='${{acc}}'><title>${{dlab}} · ${{p.v}}% · n=${{p.n}}</title></circle>`;
     if(lastp||i===0)g+=`<text x='${{x}}' y='${{y-9}}' font-size='10.5' font-weight='700' fill='${{acc}}' text-anchor='${{lastp?'end':'start'}}'>${{p.v}}%</text>`;
     if(lastp||i%step===0)g+=`<text x='${{x}}' y='${{H-12}}' font-size='9' fill='#93a1b5' text-anchor='middle'>${{p.x}}</text>`;}});
