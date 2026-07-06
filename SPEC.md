@@ -1,6 +1,6 @@
 # Customer POD — J2 Recharge → Exit — Metric & View Spec
 
-Status: **New-customer part (§3) = LOCKED & built.** Tenured (§4) + plan-behaviour (§5) still open.
+Status: **New-customer (§3) + Tenured (§4) = LOCKED & built.** Only plan-behaviour (§5) still open.
 ✔ = agreed · ❓ = open decision (see §7).
 
 New-side build notes: payment = renewal 5-min funnel (~74%, not raw ratio); Day-43 & conversion graphs show both cohort + event date; D2 has NO bucket-bars section (28d headline only).
@@ -31,14 +31,18 @@ Renewal-payment input display: 30d headline + daily/weekly toggle (last 30d). **
 
 Dropped: Day-30 active (redundant with NSM); first-renewal-R0 (leaked short plans); nudge open (whole-base only, can't new-scope); data usage (removed by request).
 
-## 4. Tenured  (owner: retention)
-| Tier | Metric | Definition | Display | Status |
-|---|---|---|---|---|
-| **NSM** | Active-base retention | rolling 30-day: active today ÷ active 30d ago, excl new. | ❓ headline (yesterday? +MTD?) | ✔ metric, ❓ display |
-| **Driver** | Expiry-day renewals | on-time renewal rate by bucket, tenured expiries. | bucket bars + ❓ trend | ✔ metric, ❓ trend |
-| **Guardrail** | % active days | avg coverage + share under 30% (rolling 30d). | headline | ✔ |
-| **Guardrail** | 1-day plan % | 1-day recharges ÷ total paid recharges. ↓ better. | headline + weekly trend | ✔ |
-| **Input** | ❓ | app-open / payment, tenured-scoped? | — | ❓ |
+## 4. Tenured  (owner: retention) — BUILT ✔ (same standard as new: daily headline + daily/weekly toggle, last 30d, 0–100 axis, real dates)
+| Tier | Metric | Definition | Display |
+|---|---|---|---|
+| **NSM** | Active-base retention | rolling 30-day: active tenured today ÷ active 30d ago. | daily headline (yesterday) + MTD (of base active on the 1st, share active yesterday). |
+| **Driver 1** | On-time renewal | of tenured expiries (all plans), share whose next plan starts ≤ expiry. | daily headline + 30d secondary + toggle. |
+| **Driver 2** | Grace recovery | of tenured expiries that MISSED on-time, share recharging within 15d (before churn). Matures 15d after expiry. | daily headline + 30d secondary + toggle. |
+| **Input** | Renewal-payment success | 5-min funnel, tenured-scoped. | 30d headline + daily toggle. |
+| **Input** | App-open near expiry | tenured expiries with app open ≤3d before expiry. | 30d headline + daily toggle. |
+| **Guardrail** | % active days | avg coverage + share under 30% (rolling 30d). | headline. |
+| **Guardrail** | 1-day plan % | 1-day recharges ÷ total paid recharges. ↓ better. | headline + weekly trend. |
+
+Decomposition: `active-base retention ≈ on-time renewal + (missed × grace recovery)`.
 
 ## 5. Plan behaviour  (own tab, both cohorts) ❓
 Descriptive plan mix — no upgrade/downgrade judgment.
