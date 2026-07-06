@@ -23,7 +23,8 @@ def wk(s):
 def series(rows):
     return [{"date":r["wk"],"v":float(r["pct"]),
              "num":int(float(r.get("num",r["den"]))),"den":int(float(r["den"])),
-             **({"cohort":r["cohort"]} if r.get("cohort") else {})} for r in rows]
+             **({"cohort":r["cohort"]} if r.get("cohort") else {}),
+             **({"l07":float(r["l07"]),"l7":float(r["l7"])} if r.get("l07") is not None else {})} for r in rows]
 
 # ---- assemble the two parts ----
 nsm_new = D["new_nsm_daily"][-1]   # last point = yesterday's cohort (series now excludes today's immature one)
@@ -51,8 +52,8 @@ SER = {
  "ten_d2":  {"legacy":None,"band":None,"legacyLabel":None,"gran":"daily","agg":"sum","toggle":True,"basis":"tenured lapsers · by expiry date · matured 15d","points":series(D["ten_d2_daily"])},
  "ten_pay": {"legacy":None,"band":None,"legacyLabel":None,"gran":"daily","agg":"sum","toggle":True,"basis":"tenured · by checkout date · last 30 days","points":series(D["ten_pay_daily"])},
  "ten_appopen":{"legacy":None,"band":None,"legacyLabel":None,"gran":"daily","agg":"sum","toggle":True,"basis":"tenured · by expiry date · last 30 days","points":series(D["ten_appopen_daily"])},
- "new_paidstat":{"legacy":None,"band":None,"legacyLabel":None,"gran":"daily","agg":"sample","toggle":True,"basis":"new active base · % on paid plan · last 30 days","points":series(D["new_paidstat_daily"])},
- "ten_paidstat":{"legacy":None,"band":None,"legacyLabel":None,"gran":"daily","agg":"sample","toggle":True,"basis":"tenured active base · % on paid plan · last 30 days","points":series(D["ten_paidstat_daily"])},
+ "new_paidstat":{"legacy":None,"band":None,"legacyLabel":None,"gran":"daily","agg":"sample","toggle":True,"basis":"new active base · paid / R0–7 / R7–15 · last 30 days","extra":[["l07","R0–7","#5b6b82"],["l7","R7–15","#c0392b"]],"points":series(D["new_paidstat_daily"])},
+ "ten_paidstat":{"legacy":None,"band":None,"legacyLabel":None,"gran":"daily","agg":"sample","toggle":True,"basis":"tenured active base · paid / R0–7 / R7–15 · last 30 days","extra":[["l07","R0–7","#5b6b82"],["l7","R7–15","#c0392b"]],"points":series(D["ten_paidstat_daily"])},
 }
 
 def bars(rowset, accent):
@@ -176,10 +177,10 @@ html = f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
    <div class="panel" id="panel-new"><div class="pinner">
      <div class="phead"><div class="ptitle" id="pt-new"></div>
        <div class="pright"><span class="pgran" id="pg-new"></span><span class="pdelta" id="pd-new"></span></div></div><div id="chart"></div></div></div>
-   <div class="sec">Inputs — daily levers</div>
-   <div class="grid">{p1_in}</div>
    <div class="sec">Guardrails</div>
    <div class="grid">{p1_g}</div>
+   <div class="sec">Inputs — daily levers</div>
+   <div class="grid">{p1_in}</div>
  </div>
 
  <div class="part" id="part-ten">
@@ -188,10 +189,10 @@ html = f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
    <div class="panel" id="panel-ten"><div class="pinner">
      <div class="phead"><div class="ptitle" id="pt-ten"></div>
        <div class="pright"><span class="pgran" id="pg-ten"></span><span class="pdelta" id="pd-ten"></span></div></div><div id="chart2"></div></div></div>
-   <div class="sec">Inputs — daily levers</div>
-   <div class="grid">{p2_in}</div>
    <div class="sec">Guardrails</div>
    <div class="grid">{g_html}</div>
+   <div class="sec">Inputs — daily levers</div>
+   <div class="grid">{p2_in}</div>
  </div>
 
  <div class="notes">
@@ -231,11 +232,13 @@ function lbl(ds){{return MO[+ds.slice(5,7)-1]+' '+ds.slice(8,10);}}
 function addDays(ds,n){{const d=new Date(ds+'T00:00:00');d.setDate(d.getDate()+n);return d.toISOString().slice(0,10);}}
 function isoMon(ds){{const d=new Date(ds+'T00:00:00');const wd=(d.getDay()+6)%7;d.setDate(d.getDate()-wd);return d.toISOString().slice(0,10);}}
 function getPoints(k){{const s=SER[k];
-  if(s.gran==='weekly'||gran[k]==='daily') return s.points.map(p=>({{x:lbl(p.date),v:p.v,n:p.den,date:p.date,cohort:p.cohort}}));
+  const ex=p=>({{l07:p.l07,l7:p.l7}});
+  if(s.gran==='weekly'||gran[k]==='daily') return s.points.map(p=>({{x:lbl(p.date),v:p.v,n:p.den,date:p.date,cohort:p.cohort,...ex(p)}}));
   const m={{}};s.points.forEach(p=>{{const w=isoMon(p.date);(m[w]=m[w]||[]).push(p);}});
   return Object.keys(m).sort().map(w=>{{const g=m[w];
+    if(g.length<7) return null;   // weekly: only complete (fully-matured) weeks
     if(s.agg==='sum'){{let nu=0,de=0;g.forEach(p=>{{nu+=p.num;de+=p.den;}});return {{x:lbl(w),v:Math.round(nu*1000/de)/10,n:de,date:w}};}}
-    const lp=g[g.length-1];return {{x:lbl(lp.date),v:lp.v,n:lp.den,date:lp.date}};}});
+    const lp=g[g.length-1];return {{x:lbl(lp.date),v:lp.v,n:lp.den,date:lp.date,...ex(lp)}};}}).filter(Boolean);
 }}
 function showPart(p){{document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('on',t.dataset.p===p));
   document.querySelectorAll('.part').forEach(x=>x.classList.toggle('on',x.id==='part-'+p));}}
@@ -265,6 +268,9 @@ function chart(s,acc,pts){{
   if(s.band){{const y1=Y(s.band[1]),y2=Y(s.band[0]);g+=`<rect x='${{pl}}' y='${{y1}}' width='${{iw}}' height='${{y2-y1}}' fill='#1f7a70' opacity='.06'/>`;}}
   if(s.legacy){{const y=Y(s.legacy);g+=`<line x1='${{pl}}' y1='${{y}}' x2='${{pl+iw}}' y2='${{y}}' stroke='#8a97ab' stroke-width='1.4' stroke-dasharray='5 4'/><text x='${{pl+iw+8}}' y='${{y+3}}' font-size='10.5' fill='#5b6b82'>${{s.legacyLabel}}</text>`;}}
   let d='';pts.forEach((p,i)=>{{d+=(i?'L':'M')+X(i)+' '+Y(p.v)+' ';}});g+=`<path d='${{d}}' fill='none' stroke='${{acc}}' stroke-width='2.2'/>`;
+  (s.extra||[]).forEach(e=>{{let dd='';pts.forEach((p,i)=>{{dd+=(i?'L':'M')+X(i)+' '+Y(p[e[0]])+' ';}});
+    g+=`<path d='${{dd}}' fill='none' stroke='${{e[2]}}' stroke-width='1.6' stroke-dasharray='4 3'/>`;
+    const lp=pts[n-1];g+=`<text x='${{X(n-1)+6}}' y='${{Y(lp[e[0]])+3}}' font-size='9.5' font-weight='700' fill='${{e[2]}}'>${{e[1]}}</text>`;}});
   const step=Math.max(1,Math.ceil(n/9)),rr=n>24?2:3.4;
   pts.forEach((p,i)=>{{const x=X(i),y=Y(p.v),lastp=i===n-1;
     const dlab=p.cohort?('install '+lbl(p.cohort)+' → day-43 '+p.x):(s.eventoff?('cohort '+p.x+' → '+s.eventlbl+' '+lbl(addDays(p.date,s.eventoff))):p.x);
