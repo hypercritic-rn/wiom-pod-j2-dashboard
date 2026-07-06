@@ -93,8 +93,8 @@ data["new_d1_daily"] = rows(*run(q_conv("daily")))
 data["new_d1_headline"] = rows(*run(q_conv("headline")))[0]
 
 # ---------- NEW Driver 2: Expiry-day renewals (renewal rate) — new-customer paid expiries ----------
-def q_newrenew(mode):   # ALL plans blended, by expiry day, last 30 days (exclude today = incomplete R0)
-    lo=f"DATEADD(day,-30,{T})"; hi=f"DATEADD(day,-1,{T})"; extra=""
+def q_newrenew(mode, ten=False):   # ALL plans blended, on-time renewal (R0), by expiry day, last 30 days (exclude today = incomplete)
+    lo=f"DATEADD(day,-30,{T})"; hi=f"DATEADD(day,-1,{T})"; extra="tenure>43" if ten else "tenure<=43"
     sel="TO_CHAR(CAST(end_ist AS DATE),'YYYY-MM-DD') wk," if mode=="daily" else "'hdln' wk,"
     return f"""
 WITH pay AS (SELECT id,price,ROUND(time_limit/86400.0) days FROM t_plan_configuration),
@@ -112,20 +112,48 @@ exp AS (SELECT s.end_ist, s.plan_days, DATEDIFF('day',s.end_ist,s.nxt) R,
    WHERE s.dpx=1 AND s.price>0 AND CAST(s.end_ist AS DATE) BETWEEN {lo} AND {hi})
 SELECT {sel} COUNT(*) den, SUM(CASE WHEN R IS NOT NULL AND R<=0 THEN 1 ELSE 0 END) num,
   ROUND(SUM(CASE WHEN R IS NOT NULL AND R<=0 THEN 1 ELSE 0 END)*100.0/COUNT(*),1) pct
-FROM exp WHERE tenure<=43 {extra} GROUP BY 1 ORDER BY 1"""
+FROM exp WHERE {extra} GROUP BY 1 ORDER BY 1"""
 data["new_d2_daily"]    = rows(*run(q_newrenew("daily")))
 data["new_d2_headline"] = rows(*run(q_newrenew("headline")))[0]
+data["ten_d1_daily"]    = rows(*run(q_newrenew("daily", ten=True)))
+data["ten_d1_headline"] = rows(*run(q_newrenew("headline", ten=True)))[0]
+
+# ---------- TENURED Driver 2: grace recovery — of missed-on-time expiries, share recharging within 15d (matured: expiry<=today-15) ----------
+def q_recovery(mode):
+    lo=f"DATEADD(day,-45,{T})"; hi=f"DATEADD(day,-15,{T})"
+    sel="TO_CHAR(CAST(end_ist AS DATE),'YYYY-MM-DD') wk," if mode=="daily" else "'hdln' wk,"
+    return f"""
+WITH pay AS (SELECT id,price FROM t_plan_configuration),
+base AS (SELECT router_nas_id, selected_plan_id, created_on,
+   DATEADD(minute,330,otp_issued_time) start_ist, DATEADD(minute,330,otp_expiry_time) end_ist
+   FROM t_router_user_mapping WHERE {STD}),
+fr AS (SELECT b.router_nas_id, MIN(CAST(b.start_ist AS DATE)) first_dt FROM base b JOIN pay p ON b.selected_plan_id=p.id GROUP BY 1),
+seq AS (SELECT b.router_nas_id, b.end_ist, p.price,
+   LEAD(b.start_ist) OVER (PARTITION BY b.router_nas_id ORDER BY b.start_ist) nxt,
+   ROW_NUMBER() OVER (PARTITION BY b.router_nas_id, CAST(b.end_ist AS DATE) ORDER BY b.created_on DESC) dpx
+   FROM base b JOIN pay p ON b.selected_plan_id=p.id),
+exp AS (SELECT s.end_ist, DATEDIFF('day',s.end_ist,s.nxt) R, DATEDIFF('day', f.first_dt, CAST(s.end_ist AS DATE)) tenure
+   FROM seq s JOIN fr f ON f.router_nas_id=s.router_nas_id
+   WHERE s.dpx=1 AND s.price>0 AND CAST(s.end_ist AS DATE) BETWEEN {lo} AND {hi})
+SELECT {sel}
+  SUM(CASE WHEN R IS NULL OR R>0 THEN 1 ELSE 0 END) den,
+  SUM(CASE WHEN R BETWEEN 1 AND 15 THEN 1 ELSE 0 END) num,
+  ROUND(SUM(CASE WHEN R BETWEEN 1 AND 15 THEN 1 ELSE 0 END)*100.0/NULLIF(SUM(CASE WHEN R IS NULL OR R>0 THEN 1 ELSE 0 END),0),1) pct
+FROM exp WHERE tenure>43 GROUP BY 1 ORDER BY 1"""
+data["ten_d2_daily"]    = rows(*run(q_recovery("daily")))
+data["ten_d2_headline"] = rows(*run(q_recovery("headline")))[0]
 
 # ---------- NEW INPUTS: payment success, nudge ----------
-def q_pay(mode):  # NEW customers, renewal-payment 5-min funnel; daily by checkout day, last 30 days (exclude today = partial)
+def q_pay(mode, ten=False):  # renewal-payment 5-min funnel; daily by checkout day, last 30 days (exclude today = partial)
     grp="TO_CHAR(CAST(ts0 AS DATE),'YYYY-MM-DD') wk," if mode=="daily" else "'hdln' wk,"
     lo=f"DATEADD(day,-30,{T})"; hi=f"DATEADD(day,-1,{T})"
+    tclause="DATEDIFF('day',fr.first_dt,e.ed) > 43" if ten else "DATEDIFF('day',fr.first_dt,e.ed) BETWEEN 0 AND 43"
     return f"""
 WITH fr AS (SELECT router_nas_id, MIN(CAST(DATEADD(minute,330,otp_issued_time) AS DATE)) first_dt FROM t_router_user_mapping WHERE {STD} GROUP BY 1),
 ev AS (SELECT TRY_TO_NUMBER(NASID_LONG) nas, TRY_TO_TIMESTAMP(TIMESTAMP) ts, EVENT_NAME en, TO_DATE(TIMESTAMP) ed
    FROM public.CT_CUSTOMER_PAYG_PAYMENT_EVENTS_MV
    WHERE FUNNEL_STEP ILIKE '%renew%' AND TO_DATE(TIMESTAMP) BETWEEN {lo} AND {hi}),
-evn AS (SELECT e.nas,e.ts,e.en FROM ev e JOIN fr ON fr.router_nas_id=e.nas WHERE DATEDIFF('day',fr.first_dt,e.ed) BETWEEN 0 AND 43),
+evn AS (SELECT e.nas,e.ts,e.en FROM ev e JOIN fr ON fr.router_nas_id=e.nas WHERE {tclause}),
 att AS (SELECT nas, MIN(ts) ts0 FROM evn WHERE en='checkout_page_loaded' GROUP BY nas, FLOOR(DATE_PART(epoch_second,ts)/300)),
 succ AS (SELECT DISTINCT nas, ts FROM evn WHERE en='payment_success_page_loaded'),
 conv AS (SELECT a.nas, a.ts0,
@@ -134,10 +162,13 @@ conv AS (SELECT a.nas, a.ts0,
 SELECT {grp} COUNT(*) den, SUM(c) num, ROUND(SUM(c)*100.0/NULLIF(COUNT(*),0),1) pct FROM conv GROUP BY 1 ORDER BY 1"""
 data["in_pay_daily"]=rows(*run(q_pay("daily")))
 data["in_pay_headline"]=rows(*run(q_pay("headline")))[0]
+data["ten_pay_daily"]=rows(*run(q_pay("daily", ten=True)))
+data["ten_pay_headline"]=rows(*run(q_pay("headline", ten=True)))[0]
 
-def q_appopen(mode):  # daily by expiry day, last 30 days (exclude today = partial)
+def q_appopen(mode, ten=False):  # daily by expiry day, last 30 days (exclude today = partial)
     grp="TO_CHAR(exp_dt,'YYYY-MM-DD') wk," if mode=="daily" else "'hdln' wk,"
     lo=f"DATEADD(day,-30,{T})"; hi=f"DATEADD(day,-1,{T})"
+    tclause="> 43" if ten else "<=43"
     return f"""
 WITH pay AS (SELECT id,price FROM t_plan_configuration),
 base AS (SELECT router_nas_id, selected_plan_id, created_on,
@@ -148,7 +179,7 @@ seq AS (SELECT b.router_nas_id, b.end_ist, p.price,
    ROW_NUMBER() OVER (PARTITION BY b.router_nas_id, CAST(b.end_ist AS DATE) ORDER BY b.created_on DESC) dpx
    FROM base b JOIN pay p ON b.selected_plan_id=p.id),
 enew AS (SELECT s.router_nas_id, CAST(s.end_ist AS DATE) exp_dt FROM seq s JOIN fr f ON f.router_nas_id=s.router_nas_id
-   WHERE s.dpx=1 AND s.price>0 AND CAST(s.end_ist AS DATE) BETWEEN {lo} AND {hi} AND DATEDIFF('day',f.first_dt,CAST(s.end_ist AS DATE))<=43),
+   WHERE s.dpx=1 AND s.price>0 AND CAST(s.end_ist AS DATE) BETWEEN {lo} AND {hi} AND DATEDIFF('day',f.first_dt,CAST(s.end_ist AS DATE)) {tclause}),
 opens AS (SELECT DISTINCT TRY_TO_NUMBER(NASIDLONG) nas, TO_DATE(TIMESTAMP) d FROM public.CT_CUSTOMER_APP_LAUNCH
    WHERE TO_DATE(TIMESTAMP) BETWEEN DATEADD(day,-34,{T}) AND {hi}),
 ew AS (SELECT e.router_nas_id, e.exp_dt, MAX(CASE WHEN o.nas IS NOT NULL THEN 1 ELSE 0 END) opened
@@ -156,6 +187,8 @@ ew AS (SELECT e.router_nas_id, e.exp_dt, MAX(CASE WHEN o.nas IS NOT NULL THEN 1 
 SELECT {grp} COUNT(*) den, SUM(opened) num, ROUND(SUM(opened)*100.0/COUNT(*),1) pct FROM ew GROUP BY 1 ORDER BY 1"""
 data["in_appopen_daily"]=rows(*run(q_appopen("daily")))
 data["in_appopen_headline"]=rows(*run(q_appopen("headline")))[0]
+data["ten_appopen_daily"]=rows(*run(q_appopen("daily", ten=True)))
+data["ten_appopen_headline"]=rows(*run(q_appopen("headline", ten=True)))[0]
 
 # ---------- TENURED NSM: active-base retention, rolling 30d, DAILY series ----------
 # For each report day D: active(D) / active(D-30), tenured (first_dt <= D-30-43).
@@ -176,30 +209,25 @@ SELECT TO_CHAR(DATEADD(day,30,a.d),'YYYY-MM-DD') wk,
          /NULLIF(COUNT(DISTINCT a.router_nas_id),0),1) pct
 FROM act a
 LEFT JOIN act b ON b.router_nas_id=a.router_nas_id AND b.d=DATEADD(day,30,a.d)
-WHERE DATEADD(day,30,a.d) BETWEEN DATEADD(day,-60,{T}) AND {T}
+WHERE DATEADD(day,30,a.d) BETWEEN DATEADD(day,-30,{T}) AND DATEADD(day,-1,{T})
   AND a.first_dt <= DATEADD(day,-43,a.d)
 GROUP BY 1 ORDER BY 1"""))
 data["ten_nsm_headline"] = data["ten_nsm_daily"][-1]
 
-# ---------- TENURED Driver: R0 by bucket (tenured, expiries last 30d) ----------
-data["ten_driver_buckets"] = rows(*run(f"""
-WITH pay AS (SELECT id,price,ROUND(time_limit/86400.0) days FROM t_plan_configuration),
-base AS (SELECT router_nas_id, selected_plan_id, created_on,
-   DATEADD(minute,330,otp_issued_time) start_ist, DATEADD(minute,330,otp_expiry_time) end_ist
-   FROM t_router_user_mapping WHERE {STD}),
-firstrec AS (SELECT b.router_nas_id, MIN(CAST(b.start_ist AS DATE)) first_dt FROM base b JOIN pay p ON b.selected_plan_id=p.id GROUP BY 1),
-seq AS (SELECT b.router_nas_id,b.end_ist,p.days plan_days,p.price,
-   LEAD(b.start_ist) OVER (PARTITION BY b.router_nas_id ORDER BY b.start_ist) next_start,
-   ROW_NUMBER() OVER (PARTITION BY b.router_nas_id, CAST(b.end_ist AS DATE) ORDER BY b.created_on DESC) dpx
-   FROM base b JOIN pay p ON b.selected_plan_id=p.id),
-exp AS (SELECT s.plan_days, DATEDIFF('day',s.end_ist,s.next_start) R,
-   DATEDIFF('day', f.first_dt, CAST(s.end_ist AS DATE)) tenure
-   FROM seq s JOIN firstrec f ON f.router_nas_id=s.router_nas_id
-   WHERE s.dpx=1 AND s.price>0 AND CAST(s.end_ist AS DATE) BETWEEN DATEADD(day,-30,{T}) AND {T})
-SELECT CASE WHEN plan_days=1 THEN '1d' WHEN plan_days=7 THEN '7d' WHEN plan_days=28 THEN '28d' ELSE 'Other' END bucket,
-  COUNT(*) den, SUM(CASE WHEN R IS NOT NULL AND R<=0 THEN 1 ELSE 0 END) num,
-  ROUND(SUM(CASE WHEN R IS NOT NULL AND R<=0 THEN 1 ELSE 0 END)*100.0/COUNT(*),1) pct
-FROM exp WHERE tenure>43 GROUP BY 1 ORDER BY 1"""))
+# Tenured NSM month-to-date: of tenured active on the 1st, share still active yesterday
+data["ten_nsm_mtd"] = rows(*run(f"""
+WITH base AS (SELECT router_nas_id, DATEADD(minute,330,otp_issued_time) start_ist, DATEADD(minute,330,otp_expiry_time) end_ist FROM t_router_user_mapping WHERE {STD}),
+fr AS (SELECT router_nas_id, MIN(CAST(start_ist AS DATE)) first_dt FROM base GROUP BY 1),
+cust AS (SELECT b.router_nas_id, MIN(f.first_dt) first_dt,
+   MAX(CASE WHEN CAST(b.start_ist AS DATE)<=DATE_TRUNC('month',{T}) THEN CAST(b.end_ist AS DATE) END) exp_m0,
+   MAX(CASE WHEN CAST(b.start_ist AS DATE)<=DATEADD(day,-1,{T}) THEN CAST(b.end_ist AS DATE) END) exp_y
+   FROM base b JOIN fr f ON f.router_nas_id=b.router_nas_id GROUP BY 1)
+SELECT 'mtd' wk, COUNT(*) den,
+  SUM(CASE WHEN exp_y >= DATEADD(day,-16,{T}) THEN 1 ELSE 0 END) num,
+  ROUND(SUM(CASE WHEN exp_y >= DATEADD(day,-16,{T}) THEN 1 ELSE 0 END)*100.0/NULLIF(COUNT(*),0),1) pct
+FROM cust
+WHERE first_dt <= DATEADD(day,-43,DATE_TRUNC('month',{T}))
+  AND exp_m0 >= DATEADD(day,-15,DATE_TRUNC('month',{T}))"""))[0]
 
 # ---------- Guardrail: % active days (tenured active base, last 30d) ----------
 data["guard_activedays"] = rows(*run(f"""
