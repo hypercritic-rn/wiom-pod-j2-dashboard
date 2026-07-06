@@ -165,9 +165,12 @@ data["in_pay_headline"]=rows(*run(q_pay("headline")))[0]
 data["ten_pay_daily"]=rows(*run(q_pay("daily", ten=True)))
 data["ten_pay_headline"]=rows(*run(q_pay("headline", ten=True)))[0]
 
-def q_appopen(mode, ten=False):  # daily by expiry day, last 30 days (exclude today = partial)
+def q_appopen(mode, ten=False, post=False):  # app open near expiry; pre = 3d before, post = 3d after (matured)
     grp="TO_CHAR(exp_dt,'YYYY-MM-DD') wk," if mode=="daily" else "'hdln' wk,"
-    lo=f"DATEADD(day,-30,{T})"; hi=f"DATEADD(day,-1,{T})"
+    if post:
+        lo=f"DATEADD(day,-33,{T})"; hi=f"DATEADD(day,-4,{T})"; win="o.d BETWEEN DATEADD(day,1,e.exp_dt) AND DATEADD(day,3,e.exp_dt)"
+    else:
+        lo=f"DATEADD(day,-30,{T})"; hi=f"DATEADD(day,-1,{T})"; win="o.d BETWEEN DATEADD(day,-3,e.exp_dt) AND e.exp_dt"
     tclause="> 43" if ten else "<=43"
     return f"""
 WITH pay AS (SELECT id,price FROM t_plan_configuration),
@@ -181,14 +184,18 @@ seq AS (SELECT b.router_nas_id, b.end_ist, p.price,
 enew AS (SELECT s.router_nas_id, CAST(s.end_ist AS DATE) exp_dt FROM seq s JOIN fr f ON f.router_nas_id=s.router_nas_id
    WHERE s.dpx=1 AND s.price>0 AND CAST(s.end_ist AS DATE) BETWEEN {lo} AND {hi} AND DATEDIFF('day',f.first_dt,CAST(s.end_ist AS DATE)) {tclause}),
 opens AS (SELECT DISTINCT TRY_TO_NUMBER(NASIDLONG) nas, TO_DATE(TIMESTAMP) d FROM public.CT_CUSTOMER_APP_LAUNCH
-   WHERE TO_DATE(TIMESTAMP) BETWEEN DATEADD(day,-34,{T}) AND {hi}),
+   WHERE TO_DATE(TIMESTAMP) BETWEEN DATEADD(day,-37,{T}) AND {T}),
 ew AS (SELECT e.router_nas_id, e.exp_dt, MAX(CASE WHEN o.nas IS NOT NULL THEN 1 ELSE 0 END) opened
-   FROM enew e LEFT JOIN opens o ON o.nas=e.router_nas_id AND o.d BETWEEN DATEADD(day,-3,e.exp_dt) AND e.exp_dt GROUP BY 1,2)
+   FROM enew e LEFT JOIN opens o ON o.nas=e.router_nas_id AND {win} GROUP BY 1,2)
 SELECT {grp} COUNT(*) den, SUM(opened) num, ROUND(SUM(opened)*100.0/COUNT(*),1) pct FROM ew GROUP BY 1 ORDER BY 1"""
 data["in_appopen_daily"]=rows(*run(q_appopen("daily")))
 data["in_appopen_headline"]=rows(*run(q_appopen("headline")))[0]
+data["in_appopen_post_daily"]=rows(*run(q_appopen("daily", post=True)))
+data["in_appopen_post_headline"]=rows(*run(q_appopen("headline", post=True)))[0]
 data["ten_appopen_daily"]=rows(*run(q_appopen("daily", ten=True)))
 data["ten_appopen_headline"]=rows(*run(q_appopen("headline", ten=True)))[0]
+data["ten_appopen_post_daily"]=rows(*run(q_appopen("daily", ten=True, post=True)))
+data["ten_appopen_post_headline"]=rows(*run(q_appopen("headline", ten=True, post=True)))[0]
 
 # ---------- TENURED NSM: active-base retention, rolling 30d, DAILY series ----------
 # For each report day D: active(D) / active(D-30), tenured (first_dt <= D-30-43).

@@ -37,7 +37,7 @@ ten = D["ten_nsm_daily"][-1]       # yesterday's rolling-30 active-base value (s
 ten_mtd = D["ten_nsm_mtd"]         # month-to-date base retention
 td1d = D["ten_d1_daily"][-1]; td1_30 = D["ten_d1_headline"]        # on-time renewal (daily + 30d)
 td2d = D["ten_d2_daily"][-1]; td2_30 = D["ten_d2_headline"]        # grace recovery (daily + 30d)
-tpay = D["ten_pay_headline"]; tapp = D["ten_appopen_headline"]     # tenured inputs (30d)
+tpay = D["ten_pay_headline"]; tapp = D["ten_appopen_headline"]; tapp_post = D["ten_appopen_post_headline"]   # tenured inputs (30d)
 gad = D["guard_activedays"]
 gp_new = D["new_paidstat_daily"][-1]; gp_ten = D["ten_paidstat_daily"][-1]   # paid-plan status snapshot (yesterday)
 
@@ -46,12 +46,14 @@ SER = {
  "new_d1":  {"legacy":None,"band":None,"legacyLabel":None,"gran":"daily","agg":"sum","toggle":True,"basis":"x = free-trial-expiry date · matured 7d","eventoff":7,"eventlbl":"+7d","points":series(D["new_d1_daily"])},
  "new_d2":  {"legacy":None,"band":None,"legacyLabel":None,"gran":"daily","agg":"sum","toggle":True,"basis":"all plans · by expiry date · last 30 days","points":series(D["new_d2_daily"])},
  "in_pay":  {"legacy":None,"band":None,"legacyLabel":None,"gran":"daily","agg":"sum","toggle":True,"basis":"new customers · by checkout date · last 30 days","points":series(D["in_pay_daily"])},
- "in_appopen":{"legacy":None,"band":None,"legacyLabel":None,"gran":"daily","agg":"sum","toggle":True,"basis":"new customers · by expiry date · last 30 days","points":series(D["in_appopen_daily"])},
+ "in_appopen":{"legacy":None,"band":None,"legacyLabel":None,"gran":"daily","agg":"sum","toggle":True,"basis":"new · ≤3d before expiry · last 30 days","points":series(D["in_appopen_daily"])},
+ "in_appopen_post":{"legacy":None,"band":None,"legacyLabel":None,"gran":"daily","agg":"sum","toggle":True,"basis":"new · ≤3d after expiry · matured 3d","points":series(D["in_appopen_post_daily"])},
  "ten_nsm": {"legacy":90,"band":[85,95],"legacyLabel":"Legacy 85–95%","gran":"daily","agg":"sample","toggle":True,"basis":"by report date · rolling 30d · last 30 days","points":series(D["ten_nsm_daily"])},
  "ten_d1":  {"legacy":None,"band":None,"legacyLabel":None,"gran":"daily","agg":"sum","toggle":True,"basis":"tenured · all plans · by expiry date · last 30 days","points":series(D["ten_d1_daily"])},
  "ten_d2":  {"legacy":None,"band":None,"legacyLabel":None,"gran":"daily","agg":"sum","toggle":True,"basis":"tenured lapsers · by expiry date · matured 15d","points":series(D["ten_d2_daily"])},
  "ten_pay": {"legacy":None,"band":None,"legacyLabel":None,"gran":"daily","agg":"sum","toggle":True,"basis":"tenured · by checkout date · last 30 days","points":series(D["ten_pay_daily"])},
- "ten_appopen":{"legacy":None,"band":None,"legacyLabel":None,"gran":"daily","agg":"sum","toggle":True,"basis":"tenured · by expiry date · last 30 days","points":series(D["ten_appopen_daily"])},
+ "ten_appopen":{"legacy":None,"band":None,"legacyLabel":None,"gran":"daily","agg":"sum","toggle":True,"basis":"tenured · ≤3d before expiry · last 30 days","points":series(D["ten_appopen_daily"])},
+ "ten_appopen_post":{"legacy":None,"band":None,"legacyLabel":None,"gran":"daily","agg":"sum","toggle":True,"basis":"tenured · ≤3d after expiry · matured 3d","points":series(D["ten_appopen_post_daily"])},
  "new_paidstat":{"legacy":None,"band":None,"legacyLabel":None,"gran":"daily","agg":"sample","toggle":True,"basis":"new active base · paid / R0–7 / R7–15 · last 30 days","extra":[["l07","R0–7","#5b6b82"],["l7","R7–15","#c0392b"]],"points":series(D["new_paidstat_daily"])},
  "ten_paidstat":{"legacy":None,"band":None,"legacyLabel":None,"gran":"daily","agg":"sample","toggle":True,"basis":"tenured active base · paid / R0–7 / R7–15 · last 30 days","extra":[["l07","R0–7","#5b6b82"],["l7","R7–15","#c0392b"]],"points":series(D["ten_paidstat_daily"])},
 }
@@ -86,11 +88,13 @@ p1 += kpi("new_d2","Driver · renew · daily",TEAL,"Expiry-day renewals",f"{floa
           f"{num(d2d['num'])} of {num(d2d['den'])} renewed on time · {fmtd(d2d['wk'])} · 30d {float(d2_30['pct']):.1f}%","Renewal rate · all plans")
 
 # Part 1 inputs (new customers only)
-ip=D["in_pay_headline"]; ia=D["in_appopen_headline"]
+ip=D["in_pay_headline"]; ia=D["in_appopen_headline"]; ipp=D["in_appopen_post_headline"]
 p1_in  = kpi("in_pay","Input · payment",INPUT,"Renewal-payment success",f"{float(ip['pct']):.1f}%",
           f"{num(ip['num'])} of {num(ip['den'])} attempts succeed in 5 min","Mechanical gate → D1/D2")
-p1_in += kpi("in_appopen","Input · app open",INPUT,"App-open near expiry",f"{float(ia['pct']):.1f}%",
+p1_in += kpi("in_appopen","Input · app open",INPUT,"App-open pre-expiry",f"{float(ia['pct']):.1f}%",
           f"{num(ia['num'])} of {num(ia['den'])} open app ≤3d before expiry","Renewal intent → D2")
+p1_in += kpi("in_appopen_post","Input · app open",INPUT,"App-open post-expiry",f"{float(ipp['pct']):.1f}%",
+          f"{num(ipp['num'])} of {num(ipp['den'])} open app ≤3d after expiry","Win-back intent")
 
 # Part 1 guardrail — paid-plan status
 p1_g = kpi("new_paidstat","Guardrail · base",GOLD,"On paid plan",f"{float(gp_new['pct']):.1f}%",
@@ -107,8 +111,10 @@ p2 += kpi("ten_d2","Driver · recover · daily",TEAL,"Grace recovery",f"{float(t
 # Part 2 inputs (tenured-scoped)
 p2_in  = kpi("ten_pay","Input · payment",INPUT,"Renewal-payment success",f"{float(tpay['pct']):.1f}%",
           f"{num(tpay['num'])} of {num(tpay['den'])} attempts succeed in 5 min","Mechanical gate → renewal")
-p2_in += kpi("ten_appopen","Input · app open",INPUT,"App-open near expiry",f"{float(tapp['pct']):.1f}%",
+p2_in += kpi("ten_appopen","Input · app open",INPUT,"App-open pre-expiry",f"{float(tapp['pct']):.1f}%",
           f"{num(tapp['num'])} of {num(tapp['den'])} open app ≤3d before expiry","Renewal intent")
+p2_in += kpi("ten_appopen_post","Input · app open",INPUT,"App-open post-expiry",f"{float(tapp_post['pct']):.1f}%",
+          f"{num(tapp_post['num'])} of {num(tapp_post['den'])} open app ≤3d after expiry","Win-back intent")
 
 g_html = f"""<div class="metric" data-k="ten_paidstat" style="--a:{GOLD}" onclick="showTrend('ten_paidstat')">
     <div class="mtier">Guardrail · base</div><div class="mname">On paid plan</div><div class="msub">Of the active (NSM) base</div>
@@ -202,7 +208,7 @@ html = f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
    <li><b>First-paid conversion</b> (new · driver) — of new installs, the share making their first paid recharge within 7 days of free-trial expiry.</li>
    <li><b>Expiry-day renewals</b> (new · driver) — of new-customer paid-plan expiries (all plans blended), the share whose next plan starts on or before expiry.</li>
    <li><b>Renewal-payment success</b> (new · input) — of new-customer renewal-payment checkouts, the share reaching payment success within 5 minutes (attempts deduped per 5-min).</li>
-   <li><b>App-open near expiry</b> (new · input) — of new-customer expiries, the share where the customer opened the app in the 3 days before expiry.</li>
+   <li><b>App-open pre-expiry / post-expiry</b> (both · input) — of expiries, the share where the customer opened the app in the 3 days before expiry (pre — renewal intent) or the 3 days after (post — win-back intent; matures 3 days after expiry).</li>
    <li><b>Active-base retention</b> (tenured · NSM) — active tenured customers today ÷ active tenured 30 days ago (rolling 30-day ratio). MTD = of the base active on the 1st, share still active yesterday.</li>
    <li><b>On-time renewal</b> (tenured · driver) — of tenured paid-plan expiries (all plans), the share whose next plan starts on or before expiry.</li>
    <li><b>Grace recovery</b> (tenured · driver) — of tenured expiries that missed on-time renewal, the share who recharge within 15 days (before churning out). Matures 15 days after expiry.</li>
@@ -221,13 +227,13 @@ html = f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
 </div>
 <script>
 const SER={ser_json};
-const ACC={{new_nsm:'{NAVY}',new_d1:'{TEAL}',new_d2:'{TEAL}',in_pay:'{INPUT}',in_appopen:'{INPUT}',new_paidstat:'{GOLD}',ten_nsm:'{NAVY}',ten_d1:'{TEAL}',ten_d2:'{TEAL}',ten_pay:'{INPUT}',ten_appopen:'{INPUT}',ten_paidstat:'{GOLD}'}};
+const ACC={{new_nsm:'{NAVY}',new_d1:'{TEAL}',new_d2:'{TEAL}',in_pay:'{INPUT}',in_appopen:'{INPUT}',in_appopen_post:'{INPUT}',new_paidstat:'{GOLD}',ten_nsm:'{NAVY}',ten_d1:'{TEAL}',ten_d2:'{TEAL}',ten_pay:'{INPUT}',ten_appopen:'{INPUT}',ten_appopen_post:'{INPUT}',ten_paidstat:'{GOLD}'}};
 const GOODDOWN={{}};
-const NAME={{new_nsm:'Day-43 retention',new_d1:'First-paid conversion',new_d2:'Expiry-day renewals',in_pay:'Payment success',in_appopen:'App-open near expiry',new_paidstat:'On paid plan',ten_nsm:'Active-base retention',ten_d1:'On-time renewal',ten_d2:'Grace recovery',ten_pay:'Renewal-payment success',ten_appopen:'App-open near expiry',ten_paidstat:'On paid plan'}};
-const PANEL={{new_nsm:'new',new_d1:'new',new_d2:'new',in_pay:'new',in_appopen:'new',new_paidstat:'new',ten_nsm:'ten',ten_d1:'ten',ten_d2:'ten',ten_pay:'ten',ten_appopen:'ten',ten_paidstat:'ten'}};
+const NAME={{new_nsm:'Day-43 retention',new_d1:'First-paid conversion',new_d2:'Expiry-day renewals',in_pay:'Payment success',in_appopen:'App-open pre-expiry',in_appopen_post:'App-open post-expiry',new_paidstat:'On paid plan',ten_nsm:'Active-base retention',ten_d1:'On-time renewal',ten_d2:'Grace recovery',ten_pay:'Renewal-payment success',ten_appopen:'App-open pre-expiry',ten_appopen_post:'App-open post-expiry',ten_paidstat:'On paid plan'}};
+const PANEL={{new_nsm:'new',new_d1:'new',new_d2:'new',in_pay:'new',in_appopen:'new',in_appopen_post:'new',new_paidstat:'new',ten_nsm:'ten',ten_d1:'ten',ten_d2:'ten',ten_pay:'ten',ten_appopen:'ten',ten_appopen_post:'ten',ten_paidstat:'ten'}};
 const MO=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 let cur={{new:null,ten:null}};
-let gran={{new_nsm:'daily',new_d1:'daily',new_d2:'daily',in_pay:'daily',in_appopen:'daily',new_paidstat:'daily',ten_nsm:'daily',ten_d1:'daily',ten_d2:'daily',ten_pay:'daily',ten_appopen:'daily',ten_paidstat:'daily'}};
+let gran={{new_nsm:'daily',new_d1:'daily',new_d2:'daily',in_pay:'daily',in_appopen:'daily',in_appopen_post:'daily',new_paidstat:'daily',ten_nsm:'daily',ten_d1:'daily',ten_d2:'daily',ten_pay:'daily',ten_appopen:'daily',ten_appopen_post:'daily',ten_paidstat:'daily'}};
 function lbl(ds){{return MO[+ds.slice(5,7)-1]+' '+ds.slice(8,10);}}
 function addDays(ds,n){{const d=new Date(ds+'T00:00:00');d.setDate(d.getDate()+n);return d.toISOString().slice(0,10);}}
 function isoMon(ds){{const d=new Date(ds+'T00:00:00');const wd=(d.getDay()+6)%7;d.setDate(d.getDate()-wd);return d.toISOString().slice(0,10);}}
