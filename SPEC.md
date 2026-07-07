@@ -44,7 +44,7 @@ Dropped: Day-30 active (redundant with NSM); first-renewal-R0 (leaked short plan
 
 Decomposition: `active-base retention ≈ on-time renewal + (missed × grace recovery)`. (1-day plan % guardrail REMOVED from tenured.)
 
-**Guardrail (BOTH cohorts): On paid plan.** Base = the cohort's **active (NSM) base** (a paid plan live, or lapsed ≤15d) — so it decomposes the retained customers. Split MECE: on paid plan (live) / lapsed R0–7d / lapsed R7–15d; sums to 100%. Headline = % on paid plan + the lapse split; single-line trend on % on paid plan (daily/weekly toggle). New base = customers with ≥1 paid recharge. New ~85% (10/5); tenured ~88% (8/4).
+**Guardrail (BOTH cohorts): On paid plan.** Base = **exactly the NSM's retained/active customers** — new: the day-43-active set (derived from the same q_d43 rows, so den = NSM active num exactly); tenured: active on D AND on D-30 (the NSM numerator). Decompose those MECE: on paid plan (live) / lapsed R0–7d / lapsed R7–15d; sums to 100%. Purpose: guard against a high NSM that is mostly lapsed-in-grace rather than truly paid. Trend plots all 3 bands. New headline = 30d aggregate (daily base ~27, noisy) ~76% (9/15); tenured = daily ~88% (8/5).
 
 ## 5. Plan behaviour  (own tab, both cohorts) ❓
 Descriptive plan mix — no upgrade/downgrade judgment.
