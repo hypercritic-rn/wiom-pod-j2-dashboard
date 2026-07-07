@@ -63,11 +63,21 @@ ls AS (SELECT i.router_nas_id, i.install_dt, i.day43,
    FROM installs i JOIN base b ON b.router_nas_id=i.router_nas_id GROUP BY 1,2,3)
 SELECT {sel} COUNT(*) den,
   SUM(CASE WHEN last_end>=DATEADD(day,-15,day43) THEN 1 ELSE 0 END) num,
-  ROUND(SUM(CASE WHEN last_end>=DATEADD(day,-15,day43) THEN 1 ELSE 0 END)*100.0/COUNT(*),1) pct
+  ROUND(SUM(CASE WHEN last_end>=DATEADD(day,-15,day43) THEN 1 ELSE 0 END)*100.0/COUNT(*),1) pct,
+  SUM(CASE WHEN last_end>=day43 THEN 1 ELSE 0 END) onpaid,
+  SUM(CASE WHEN last_end>=DATEADD(day,-7,day43) AND last_end<day43 THEN 1 ELSE 0 END) r07,
+  SUM(CASE WHEN last_end>=DATEADD(day,-15,day43) AND last_end<DATEADD(day,-7,day43) THEN 1 ELSE 0 END) r715
 FROM ls GROUP BY {grpby} ORDER BY 1"""
 data["new_nsm_daily"] = rows(*run(q_d43("daily")))
 data["new_nsm_headline"] = rows(*run(q_d43("headline")))[0]
 data["new_nsm_mtd"] = rows(*run(q_d43("mtd")))[0]
+# New guardrail = decompose the NSM's day-43-active customers (same base) into on-paid / R0-7 / R7-15
+def _paidrow(r):
+    a=float(r["num"]) or 1
+    return {"wk":r["wk"],"den":int(float(r["num"])),"num":int(float(r["onpaid"])),
+            "pct":round(float(r["onpaid"])*100.0/a,1),"l07":round(float(r["r07"])*100.0/a,1),"l7":round(float(r["r715"])*100.0/a,1)}
+data["new_paidstat_daily"] = [_paidrow(r) for r in data["new_nsm_daily"]]
+data["new_paidstat_headline"] = _paidrow(data["new_nsm_headline"])
 
 # ---------- NEW Driver 1: first-paid conversion R7, weekly + 30d headline ----------
 def q_conv(mode):   # daily = by free-trial-expiry day (last 90d, matured); headline = 30d aggregate
@@ -254,28 +264,30 @@ SELECT COUNT(*) den, ROUND(AVG(ad)/30.0*100,1) avg_pct,
   ROUND(SUM(CASE WHEN ad<9 THEN 1 ELSE 0 END)*100.0/COUNT(*),1) pct
 FROM cov"""))[0]
 
-# ---------- Guardrail: paid-plan status snapshot per day (both cohorts) ----------
-# Base = the NSM active base (paid plan live, or lapsed <=15d). Split: on paid plan / lapsed R0-7 / lapsed R7-15.
-def q_paidstat(ten):
-    tclause = "install_dt <= DATEADD(day,-43,d)" if ten else "install_dt > DATEADD(day,-43,d)"
+# ---------- Guardrail: TENURED paid-plan status = decompose the NSM numerator (active on D AND on D-30) ----------
+# Split the retained customers by paid-plan state at D: on paid plan / lapsed R0-7 / lapsed R7-15.
+def q_paidstat():
     return f"""
 WITH pay AS (SELECT id,price FROM t_plan_configuration),
 allrec AS (SELECT router_nas_id, CAST(DATEADD(minute,330,otp_issued_time) AS DATE) sd, CAST(DATEADD(minute,330,otp_expiry_time) AS DATE) ed, p.price
    FROM t_router_user_mapping t JOIN pay p ON t.selected_plan_id=p.id WHERE {STD}),
 inst AS (SELECT router_nas_id, MIN(sd) install_dt FROM allrec GROUP BY 1),
-base AS (SELECT * FROM allrec WHERE ed >= DATEADD(day,-60,{T})),
+base AS (SELECT * FROM allrec WHERE ed >= DATEADD(day,-80,{T})),
 spine AS (SELECT DATEADD(day, SEQ4(), DATEADD(day,-30,{T})) d FROM TABLE(GENERATOR(ROWCOUNT=>30))),
-cd AS (SELECT s.d, b.router_nas_id, i.install_dt, MAX(CASE WHEN b.sd<=s.d AND b.price>0 THEN b.ed END) latest_exp
+cd AS (SELECT s.d, b.router_nas_id, i.install_dt,
+   MAX(CASE WHEN b.sd<=s.d AND b.price>0 THEN b.ed END) le1,
+   MAX(CASE WHEN b.sd<=DATEADD(day,-30,s.d) AND b.price>0 THEN b.ed END) le0
    FROM spine s JOIN base b ON b.sd<=s.d JOIN inst i ON i.router_nas_id=b.router_nas_id GROUP BY s.d, b.router_nas_id, i.install_dt),
-stat AS (SELECT d, install_dt, CASE WHEN latest_exp>=d THEN 'paid' WHEN latest_exp>=DATEADD(day,-7,d) THEN 'l07' WHEN latest_exp>=DATEADD(day,-15,d) THEN 'l7' END st
-   FROM cd WHERE latest_exp IS NOT NULL)
+stat AS (SELECT d, CASE WHEN le1>=d THEN 'paid' WHEN le1>=DATEADD(day,-7,d) THEN 'l07' WHEN le1>=DATEADD(day,-15,d) THEN 'l7' END st
+   FROM cd WHERE le1>=DATEADD(day,-15,d)              -- active on D
+     AND le0>=DATEADD(day,-45,d)                       -- AND active on D-30 (NSM numerator)
+     AND install_dt<=DATEADD(day,-43,d))               -- tenured
 SELECT TO_CHAR(d,'YYYY-MM-DD') wk, COUNT(*) den, SUM(CASE WHEN st='paid' THEN 1 ELSE 0 END) num,
    ROUND(SUM(CASE WHEN st='paid' THEN 1 ELSE 0 END)*100.0/COUNT(*),1) pct,
    ROUND(SUM(CASE WHEN st='l07' THEN 1 ELSE 0 END)*100.0/COUNT(*),1) l07,
    ROUND(SUM(CASE WHEN st='l7' THEN 1 ELSE 0 END)*100.0/COUNT(*),1) l7
-FROM stat WHERE st IS NOT NULL AND {tclause} GROUP BY 1 ORDER BY 1"""
-data["new_paidstat_daily"] = rows(*run(q_paidstat(False)))
-data["ten_paidstat_daily"] = rows(*run(q_paidstat(True)))
+FROM stat GROUP BY 1 ORDER BY 1"""
+data["ten_paidstat_daily"] = rows(*run(q_paidstat()))
 
 # stamp (passed in by CI via env; avoids Date.now in restricted contexts)
 data["as_of"] = os.environ.get("AS_OF", "")

@@ -39,7 +39,8 @@ td1d = D["ten_d1_daily"][-1]; td1_30 = D["ten_d1_headline"]        # on-time ren
 td2d = D["ten_d2_daily"][-1]; td2_30 = D["ten_d2_headline"]        # grace recovery (daily + 30d)
 tpay = D["ten_pay_headline"]; tapp = D["ten_appopen_headline"]; tapp_post = D["ten_appopen_post_headline"]   # tenured inputs (30d)
 gad = D["guard_activedays"]
-gp_new = D["new_paidstat_daily"][-1]; gp_ten = D["ten_paidstat_daily"][-1]   # paid-plan status snapshot (yesterday)
+gp_new = D["new_paidstat_headline"]              # 30d aggregate (new daily base ~27, use stable)
+gp_ten = D["ten_paidstat_daily"][-1]             # tenured yesterday (base ~91k, stable)
 
 SER = {
  "new_nsm": {"legacy":85,"band":None,"legacyLabel":"Legacy M1 ~85%","gran":"daily","agg":"sum","toggle":True,"basis":"x = day-43 date · last 30 days · cohort installed 43d earlier","points":series(D["new_nsm_daily"])},
@@ -54,8 +55,8 @@ SER = {
  "ten_pay": {"legacy":None,"band":None,"legacyLabel":None,"gran":"daily","agg":"sum","toggle":True,"basis":"tenured · by checkout date · last 30 days","points":series(D["ten_pay_daily"])},
  "ten_appopen":{"legacy":None,"band":None,"legacyLabel":None,"gran":"daily","agg":"sum","toggle":True,"basis":"tenured · ≤3d before expiry · last 30 days","points":series(D["ten_appopen_daily"])},
  "ten_appopen_post":{"legacy":None,"band":None,"legacyLabel":None,"gran":"daily","agg":"sum","toggle":True,"basis":"tenured · ≤3d after expiry · matured 3d","points":series(D["ten_appopen_post_daily"])},
- "new_paidstat":{"legacy":None,"band":None,"legacyLabel":None,"gran":"daily","agg":"sample","toggle":True,"basis":"new active base · paid / R0–7 / R7–15 · last 30 days","extra":[["l07","R0–7","#5b6b82"],["l7","R7–15","#c0392b"]],"points":series(D["new_paidstat_daily"])},
- "ten_paidstat":{"legacy":None,"band":None,"legacyLabel":None,"gran":"daily","agg":"sample","toggle":True,"basis":"tenured active base · paid / R0–7 / R7–15 · last 30 days","extra":[["l07","R0–7","#5b6b82"],["l7","R7–15","#c0392b"]],"points":series(D["ten_paidstat_daily"])},
+ "new_paidstat":{"legacy":None,"band":None,"legacyLabel":None,"gran":"daily","agg":"sample","toggle":True,"basis":"of day-43-active customers · paid / R0–7 / R7–15","extra":[["l07","R0–7","#5b6b82"],["l7","R7–15","#c0392b"]],"points":series(D["new_paidstat_daily"])},
+ "ten_paidstat":{"legacy":None,"band":None,"legacyLabel":None,"gran":"daily","agg":"sample","toggle":True,"basis":"of NSM-retained customers · paid / R0–7 / R7–15","extra":[["l07","R0–7","#5b6b82"],["l7","R7–15","#c0392b"]],"points":series(D["ten_paidstat_daily"])},
 }
 
 def bars(rowset, accent):
@@ -98,7 +99,7 @@ p1_in += kpi("in_appopen_post","Input · app open",INPUT,"App-open post-expiry",
 
 # Part 1 guardrail — paid-plan status
 p1_g = kpi("new_paidstat","Guardrail · base",GOLD,"On paid plan",f"{float(gp_new['pct']):.1f}%",
-          f"R0–7 lapsed {float(gp_new['l07']):.1f}% · R7–15 {float(gp_new['l7']):.1f}%","Of the active (NSM) base")
+          f"R0–7 lapsed {float(gp_new['l07']):.1f}% · R7–15 {float(gp_new['l7']):.1f}%","Of day-43-retained (NSM)")
 
 # Part 2 cards — NSM + 2 drivers
 p2 = kpi("ten_nsm","NSM · active base · daily",NAVY,"Active-base retention",f"{float(ten['pct']):.1f}%",
@@ -117,7 +118,7 @@ p2_in += kpi("ten_appopen_post","Input · app open",INPUT,"App-open post-expiry"
           f"{num(tapp_post['num'])} of {num(tapp_post['den'])} open app ≤3d after expiry","Win-back intent")
 
 g_html = f"""<div class="metric" data-k="ten_paidstat" style="--a:{GOLD}" onclick="showTrend('ten_paidstat')">
-    <div class="mtier">Guardrail · base</div><div class="mname">On paid plan</div><div class="msub">Of the active (NSM) base</div>
+    <div class="mtier">Guardrail · base</div><div class="mname">On paid plan</div><div class="msub">Of NSM-retained customers</div>
     <div class="mval">{float(gp_ten['pct']):.1f}%</div>
     <div class="mdet">R0–7 lapsed {float(gp_ten['l07']):.1f}% · R7–15 {float(gp_ten['l7']):.1f}%</div><div class="mcue"><span class="cue">trend ↗</span></div></div>
   <div class="metric notrend" style="--a:{GOLD}">
@@ -212,7 +213,7 @@ html = f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
    <li><b>Active-base retention</b> (tenured · NSM) — active tenured customers today ÷ active tenured 30 days ago (rolling 30-day ratio). MTD = of the base active on the 1st, share still active yesterday.</li>
    <li><b>On-time renewal</b> (tenured · driver) — of tenured paid-plan expiries (all plans), the share whose next plan starts on or before expiry.</li>
    <li><b>Grace recovery</b> (tenured · driver) — of tenured expiries that missed on-time renewal, the share who recharge within 15 days (before churning out). Matures 15 days after expiry.</li>
-   <li><b>On paid plan</b> (both · guardrail) — of each cohort's active (NSM) base (a paid plan live, or lapsed ≤15 days), the share on a live paid plan; the rest splits into lapsed R0–7 days and R7–15 days (the at-risk tail). Sums to 100% of the active base.</li>
+   <li><b>On paid plan</b> (both · guardrail) — decomposes the customers the NSM counts as retained (new: active at day 43; tenured: active today and 30 days ago) by their paid-plan state: on a live paid plan, or lapsed R0–7 / R7–15 days but still inside the 15-day active window. Sums to 100%. Guards against a high NSM that is mostly lapsed-but-not-yet-churned rather than truly paid.</li>
    <li><b>% active days</b> (tenured · guardrail) — average share of days the connection was active over the rolling 30 days.</li>
    </ul>
    <div style="font-weight:700;color:#14284a;margin:12px 0 7px;font-size:13px">Method</div>
