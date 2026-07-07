@@ -37,7 +37,8 @@ ten = D["ten_nsm_daily"][-1]       # yesterday's rolling-30 active-base value (s
 ten_mtd = D["ten_nsm_mtd"]         # month-to-date base retention
 td1d = D["ten_d1_daily"][-1]; td1_30 = D["ten_d1_headline"]        # on-time renewal (daily + 30d)
 td2d = D["ten_d2_daily"][-1]; td2_30 = D["ten_d2_headline"]        # grace recovery (daily + 30d)
-tpay = D["ten_pay_headline"]; tapp = D["ten_appopen_headline"]; tapp_post = D["ten_appopen_post_headline"]   # tenured inputs (30d)
+tpay = D["ten_pay_daily"][-1]; tapp = D["ten_appopen_daily"][-1]; tapp_post = D["ten_appopen_post_daily"][-1]        # tenured inputs (daily)
+tpay30 = D["ten_pay_headline"]; tapp30 = D["ten_appopen_headline"]; tapp_post30 = D["ten_appopen_post_headline"]      # 30d secondary
 gad = D["guard_activedays"]
 gp_new = D["new_paidstat_headline"]              # 30d aggregate (new daily base ~27, use stable)
 gp_ten = D["ten_paidstat_daily"][-1]             # tenured yesterday (base ~91k, stable)
@@ -89,13 +90,14 @@ p1 += kpi("new_d2","Driver · renew · daily",TEAL,"Expiry-day renewals",f"{floa
           f"{num(d2d['num'])} of {num(d2d['den'])} renewed on time · {fmtd(d2d['wk'])} · 30d {float(d2_30['pct']):.1f}%","Renewal rate · all plans")
 
 # Part 1 inputs (new customers only)
-ip=D["in_pay_headline"]; ia=D["in_appopen_headline"]; ipp=D["in_appopen_post_headline"]
-p1_in  = kpi("in_pay","Input · payment",INPUT,"Renewal-payment success",f"{float(ip['pct']):.1f}%",
-          f"{num(ip['num'])} of {num(ip['den'])} attempts succeed in 5 min","Mechanical gate → D1/D2")
-p1_in += kpi("in_appopen","Input · app open",INPUT,"App-open pre-expiry",f"{float(ia['pct']):.1f}%",
-          f"{num(ia['num'])} of {num(ia['den'])} open app ≤3d before expiry","Renewal intent → D2")
-p1_in += kpi("in_appopen_post","Input · app open",INPUT,"App-open post-expiry",f"{float(ipp['pct']):.1f}%",
-          f"{num(ipp['num'])} of {num(ipp['den'])} open app ≤3d after expiry","Win-back intent")
+ip=D["in_pay_daily"][-1]; ia=D["in_appopen_daily"][-1]; ipp=D["in_appopen_post_daily"][-1]
+ip30=D["in_pay_headline"]; ia30=D["in_appopen_headline"]; ipp30=D["in_appopen_post_headline"]
+p1_in  = kpi("in_pay","Input · payment · daily",INPUT,"Renewal-payment success",f"{float(ip['pct']):.1f}%",
+          f"{num(ip['num'])} of {num(ip['den'])} in 5 min · {fmtd(ip['wk'])} · 30d {float(ip30['pct']):.1f}%","Mechanical gate → D1/D2")
+p1_in += kpi("in_appopen","Input · app open · daily",INPUT,"App-open pre-expiry",f"{float(ia['pct']):.1f}%",
+          f"{num(ia['num'])} of {num(ia['den'])} ≤3d before · {fmtd(ia['wk'])} · 30d {float(ia30['pct']):.1f}%","Renewal intent → D2")
+p1_in += kpi("in_appopen_post","Input · app open · daily",INPUT,"App-open post-expiry",f"{float(ipp['pct']):.1f}%",
+          f"{num(ipp['num'])} of {num(ipp['den'])} ≤3d after · {fmtd(ipp['wk'])} · 30d {float(ipp30['pct']):.1f}%","Win-back intent")
 
 # Part 1 guardrail — paid-plan status
 p1_g = kpi("new_paidstat","Guardrail · base",GOLD,"On paid plan",f"{float(gp_new['pct']):.1f}%",
@@ -110,12 +112,12 @@ p2 += kpi("ten_d2","Driver · recover · daily",TEAL,"Grace recovery",f"{float(t
           f"{num(td2d['num'])} of {num(td2d['den'])} lapsers win back ≤15d · {fmtd(td2d['wk'])} · 30d {float(td2_30['pct']):.1f}%","Recover before churn")
 
 # Part 2 inputs (tenured-scoped)
-p2_in  = kpi("ten_pay","Input · payment",INPUT,"Renewal-payment success",f"{float(tpay['pct']):.1f}%",
-          f"{num(tpay['num'])} of {num(tpay['den'])} attempts succeed in 5 min","Mechanical gate → renewal")
-p2_in += kpi("ten_appopen","Input · app open",INPUT,"App-open pre-expiry",f"{float(tapp['pct']):.1f}%",
-          f"{num(tapp['num'])} of {num(tapp['den'])} open app ≤3d before expiry","Renewal intent")
-p2_in += kpi("ten_appopen_post","Input · app open",INPUT,"App-open post-expiry",f"{float(tapp_post['pct']):.1f}%",
-          f"{num(tapp_post['num'])} of {num(tapp_post['den'])} open app ≤3d after expiry","Win-back intent")
+p2_in  = kpi("ten_pay","Input · payment · daily",INPUT,"Renewal-payment success",f"{float(tpay['pct']):.1f}%",
+          f"{num(tpay['num'])} of {num(tpay['den'])} in 5 min · {fmtd(tpay['wk'])} · 30d {float(tpay30['pct']):.1f}%","Mechanical gate → renewal")
+p2_in += kpi("ten_appopen","Input · app open · daily",INPUT,"App-open pre-expiry",f"{float(tapp['pct']):.1f}%",
+          f"{num(tapp['num'])} of {num(tapp['den'])} ≤3d before · {fmtd(tapp['wk'])} · 30d {float(tapp30['pct']):.1f}%","Renewal intent")
+p2_in += kpi("ten_appopen_post","Input · app open · daily",INPUT,"App-open post-expiry",f"{float(tapp_post['pct']):.1f}%",
+          f"{num(tapp_post['num'])} of {num(tapp_post['den'])} ≤3d after · {fmtd(tapp_post['wk'])} · 30d {float(tapp_post30['pct']):.1f}%","Win-back intent")
 
 g_html = f"""<div class="metric" data-k="ten_paidstat" style="--a:{GOLD}" onclick="showTrend('ten_paidstat')">
     <div class="mtier">Guardrail · base</div><div class="mname">On paid plan</div><div class="msub">Of NSM-retained customers</div>
