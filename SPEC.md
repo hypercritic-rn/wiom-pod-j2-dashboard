@@ -28,7 +28,7 @@ Renewal health, so an owner can see if action is needed. Two cohorts split only 
 | **Input** | App-open pre-expiry | % of new-customer expiries with an app open ≤3d before expiry (renewal intent). | 30d headline + daily/weekly toggle. | expiry date |
 | **Input** | App-open post-expiry | % with an app open ≤3d AFTER expiry (win-back intent). Matures 3d after expiry. | 30d headline + daily/weekly toggle. | expiry date |
 
-Renewal-payment input display: 30d headline + daily/weekly toggle (last 30d). **All new-side charts: daily + toggle, last 30 days, fixed 0–100% y-axis.** Bottom of page carries a Metric-definitions + Method block.
+**All inputs (both cohorts) display: daily headline + 30d secondary + daily/weekly toggle** (matches the graph endpoint; card big number = last daily point, 30d beside). **All charts: daily + toggle, last 30 days, fixed 0–100% y-axis.** Bottom of page carries a Metric-definitions + Method block.
 
 Dropped: Day-30 active (redundant with NSM); first-renewal-R0 (leaked short plans); nudge open (whole-base only, can't new-scope); data usage (removed by request).
 
