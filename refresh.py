@@ -193,8 +193,8 @@ seq AS (SELECT b.router_nas_id, b.end_ist, p.price,
    FROM base b JOIN pay p ON b.selected_plan_id=p.id),
 enew AS (SELECT s.router_nas_id, CAST(s.end_ist AS DATE) exp_dt FROM seq s JOIN fr f ON f.router_nas_id=s.router_nas_id
    WHERE s.dpx=1 AND s.price>0 AND CAST(s.end_ist AS DATE) BETWEEN {lo} AND {hi} AND DATEDIFF('day',f.first_dt,CAST(s.end_ist AS DATE)) {tclause}),
-opens AS (SELECT DISTINCT TRY_TO_NUMBER(NASIDLONG) nas, TO_DATE(TIMESTAMP) d FROM public.CT_CUSTOMER_APP_LAUNCH
-   WHERE TO_DATE(TIMESTAMP) BETWEEN DATEADD(day,-37,{T}) AND {T}),
+opens AS (SELECT DISTINCT TRY_TO_NUMBER(NASID) nas, TO_DATE(TIMESTAMP) d FROM PROD_DB.CLEVERTAP_CUSTOMER_API.CLEVERTAP_EVENTS
+   WHERE EVENT_NAME='App Launched' AND TIMESTAMP >= TO_VARCHAR(DATEADD(day,-37,{T})) AND TIMESTAMP < TO_VARCHAR(DATEADD(day,1,{T}))),
 ew AS (SELECT e.router_nas_id, e.exp_dt, MAX(CASE WHEN o.nas IS NOT NULL THEN 1 ELSE 0 END) opened
    FROM enew e LEFT JOIN opens o ON o.nas=e.router_nas_id AND {win} GROUP BY 1,2)
 SELECT {grp} COUNT(*) den, SUM(opened) num, ROUND(SUM(opened)*100.0/COUNT(*),1) pct FROM ew GROUP BY 1 ORDER BY 1"""
