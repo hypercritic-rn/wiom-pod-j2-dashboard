@@ -77,7 +77,7 @@ Descriptive plan mix — no upgrade/downgrade judgment.
 ## 8. Verified data sources
 - `T_ROUTER_USER_MAPPING`, `T_PLAN_CONFIGURATION` (combined_setting_id=22 = 13 PAYG plans).
 - Payment: `PUBLIC.CT_CUSTOMER_PAYG_PAYMENT_EVENTS_MV` (checkout/success), join `NASID_LONG`.
-- App-open: `PUBLIC.CT_CUSTOMER_APP_LAUNCH` (`NASIDLONG`, timestamp).
+- App-open: `PROD_DB.CLEVERTAP_CUSTOMER_API.CLEVERTAP_EVENTS` where `EVENT_NAME='App Launched'`, join `TRY_TO_NUMBER(NASID)` → router_nas_id, `TIMESTAMP` is text & already IST (no +330; filter with string comparison for pruning). **Switched from `CT_CUSTOMER_APP_LAUNCH`** (Jul 2026) — that table had an 18-day outage (18 May–4 Jun) and stopped matching new installs after ~15 Jun (7–63% match), which faked a new-customer app-open decline. CleverTap matches recent installs at 96–99%, no gaps. Effect: new pre-expiry 63→88%, post 54→70%; tenured ~unchanged.
 - Nudge (whole-base only): `DBT_CUSTOMER_POD.FCT_PRE_EXPIRY_NUDGE_DAILY`.
 - Usage: `DBT.FCT_FREE_TRIAL_USAGE_GB`, `DBT.HOURLY_USAGE_PRORATED` (PUBLIC `_DT` is dead).
 - **Note:** a maintained `DBT_CUSTOMER_POD` layer exists (M1, MoM, R0, etc.) built to the *original* sheet defs — diverges from ours (their M1 71% vs our 91%). We are NOT adopting it; keep our definitions.
